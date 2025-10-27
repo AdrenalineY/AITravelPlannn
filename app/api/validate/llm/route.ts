@@ -48,7 +48,9 @@ async function validateAliyunLLM(
   model?: string
 ): Promise<NextResponse> {
   try {
-    const url = baseUrl || 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation'
+    // 阿里云百炼(DashScope)的正确 API 端点
+    // 注意：URL 路径不包含 /generation，直接是 /compatible-mode/v1/chat/completions
+    const url = baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     const testModel = model || 'qwen-turbo'
 
     const response = await fetch(url, {
@@ -59,27 +61,38 @@ async function validateAliyunLLM(
       },
       body: JSON.stringify({
         model: testModel,
-        input: {
-          messages: [
-            {
-              role: 'user',
-              content: 'test',
-            },
-          ],
-        },
-        parameters: {
-          max_tokens: 10,
-        },
+        messages: [
+          {
+            role: 'user',
+            content: 'test',
+          },
+        ],
+        max_tokens: 10,
       }),
     })
 
-    const data = await response.json()
+    // 获取响应文本,然后尝试解析 JSON
+    const responseText = await response.text()
+    let data: any = {}
+    
+    try {
+      if (responseText) {
+        data = JSON.parse(responseText)
+      }
+    } catch (parseError) {
+      console.error('JSON 解析失败，原始响应:', responseText)
+      return NextResponse.json({
+        success: false,
+        error: '服务器返回了无效的响应格式',
+        details: `HTTP ${response.status}: ${responseText.substring(0, 200)}`,
+      })
+    }
 
-    // 阿里云 API 响应格式
-    // 成功: { output: {...}, usage: {...}, request_id: "..." }
-    // 失败: { code: "...", message: "...", request_id: "..." }
+    // 阿里云百炼 OpenAI 兼容模式响应格式
+    // 成功: { id: "...", choices: [{...}], usage: {...}, ... }
+    // 失败: { error: { message: "...", type: "...", code: "..." } }
 
-    if (response.ok || data.output || data.usage) {
+    if (response.ok && (data.choices || data.id)) {
       return NextResponse.json({
         success: true,
         message: '验证成功',
@@ -97,13 +110,21 @@ async function validateAliyunLLM(
       return NextResponse.json({
         success: false,
         error: 'API Key 无效或已过期',
-        details: data.message || data.code,
+        details: data.error?.message || data.message || data.code,
+      })
+    } else if (response.status === 404) {
+      return NextResponse.json({
+        success: false,
+        error: 'API 端点不存在',
+        details: `请检查 Base URL 是否正确。推荐使用: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`,
+        statusCode: response.status,
       })
     } else {
       return NextResponse.json({
         success: false,
-        error: `API 返回错误: ${data.message || data.code || '未知错误'}`,
+        error: `API 返回错误: ${data.error?.message || data.message || data.code || '未知错误'}`,
         statusCode: response.status,
+        details: JSON.stringify(data).substring(0, 200),
       })
     }
   } catch (error) {
@@ -140,7 +161,22 @@ async function validateOpenAILLM(
       }),
     })
 
-    const data = await response.json()
+    // 获取响应文本,然后尝试解析 JSON
+    const responseText = await response.text()
+    let data: any = {}
+    
+    try {
+      if (responseText) {
+        data = JSON.parse(responseText)
+      }
+    } catch (parseError) {
+      console.error('JSON 解析失败，原始响应:', responseText)
+      return NextResponse.json({
+        success: false,
+        error: '服务器返回了无效的响应格式',
+        details: `HTTP ${response.status}: ${responseText.substring(0, 200)}`,
+      })
+    }
 
     if (response.ok) {
       return NextResponse.json({

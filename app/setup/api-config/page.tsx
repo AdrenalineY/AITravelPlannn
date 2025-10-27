@@ -86,37 +86,96 @@ export default function APIConfigPage() {
       await form.validateFields()
 
       const values = form.getFieldsValue()
-      const stepConfigs = {
-        0: { llm: values.llm },
-        1: { speech: values.speech },
-        2: { map: values.map },
-      }
 
-      // 验证当前步骤的配置
-      const stepConfig = stepConfigs[currentStep as keyof typeof stepConfigs]
-      const result = await configService.validateConfig({
-        ...config!,
-        ...stepConfig,
-      } as APIConfig)
+      // 只验证当前步骤的配置
+      let isValid = false
+      let validationError = ''
 
-      setValidationResult(`step-${currentStep}`, result)
+      if (currentStep === 0) {
+        // 验证 LLM
+        if (!values.llm?.apiKey) {
+          message.error('请输入 LLM API 密钥')
+          return false
+        }
 
-      if (!result.isValid) {
-        Object.entries(result.errors || {}).forEach(([key, error]) => {
-          message.error(`${key}: ${error}`)
+        const response = await fetch('/api/validate/llm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: values.llm.provider || 'aliyun',
+            apiKey: values.llm.apiKey,
+            baseUrl: values.llm.baseUrl,
+            model: values.llm.model,
+          }),
         })
-        return false
-      }
 
-      if (result.warnings) {
-        Object.entries(result.warnings).forEach(([key, warning]) => {
-          message.warning(`${key}: ${warning}`)
+        const data = await response.json()
+        
+        if (data.success) {
+          message.success('LLM API 验证成功')
+          isValid = true
+        } else {
+          message.error(`LLM API 验证失败: ${data.error}`)
+          return false
+        }
+      } else if (currentStep === 1) {
+        // 验证语音 (可选)
+        if (!values.speech?.apiKey) {
+          message.warning('语音 API 密钥为空，语音功能将不可用')
+          isValid = true // 语音是可选的，允许跳过
+        } else {
+          const response = await fetch('/api/validate/speech', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: values.speech.provider || 'xunfei',
+              apiKey: values.speech.apiKey,
+              appId: values.speech.appId,
+              apiSecret: values.speech.apiSecret,
+            }),
+          })
+
+          const data = await response.json()
+          
+          if (data.success) {
+            message.success('语音 API 验证成功')
+            isValid = true
+          } else {
+            message.warning(`语音 API 验证失败: ${data.error}，可继续但语音功能不可用`)
+            isValid = true // 语音验证失败仍可继续
+          }
+        }
+      } else if (currentStep === 2) {
+        // 验证地图
+        if (!values.map?.apiKey) {
+          message.error('请输入地图 API 密钥')
+          return false
+        }
+
+        const response = await fetch('/api/validate/map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: values.map.provider || 'amap',
+            apiKey: values.map.apiKey,
+          }),
         })
+
+        const data = await response.json()
+        
+        if (data.success) {
+          message.success('地图 API 验证成功')
+          isValid = true
+        } else {
+          message.error(`地图 API 验证失败: ${data.error}`)
+          return false
+        }
       }
 
-      return true
+      return isValid
     } catch (error: any) {
-      message.error('验证失败')
+      console.error('验证失败:', error)
+      message.error('验证过程出错: ' + error.message)
       return false
     } finally {
       setIsValidating(false)
@@ -257,11 +316,19 @@ export default function APIConfigPage() {
                   <Input.Password placeholder="sk-xxxxxxxxxxxx" />
                 </Form.Item>
 
-                <Form.Item label="Base URL（可选）" name={['llm', 'baseUrl']}>
-                  <Input placeholder="https://dashscope.aliyuncs.com" />
+                <Form.Item 
+                  label="Base URL（可选）" 
+                  name={['llm', 'baseUrl']}
+                  extra="默认使用阿里云百炼 OpenAI 兼容接口"
+                >
+                  <Input placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" />
                 </Form.Item>
 
-                <Form.Item label="模型名称（可选）" name={['llm', 'model']}>
+                <Form.Item 
+                  label="模型名称（可选）" 
+                  name={['llm', 'model']}
+                  extra="推荐: qwen-turbo, qwen-plus, qwen-max"
+                >
                   <Input placeholder="qwen-turbo" />
                 </Form.Item>
               </div>
@@ -321,7 +388,11 @@ export default function APIConfigPage() {
                   label="API Key"
                   name={['map', 'apiKey']}
                   rules={[{ required: true, message: '请输入地图 API 密钥' }]}
-                  extra="用于 POI 搜索和路线规划"
+                  extra={
+                    form.getFieldValue(['map', 'provider']) === 'amap' 
+                      ? "⚠️ 请使用「Web服务」平台的Key,不要使用「Web端(JS API)」的Key。申请地址: https://console.amap.com/dev/key/app"
+                      : "用于 POI 搜索和路线规划"
+                  }
                 >
                   <Input.Password placeholder="xxxxxxxxxx" />
                 </Form.Item>

@@ -41,11 +41,15 @@ export async function POST(request: NextRequest) {
  */
 async function validateAmapKey(apiKey: string): Promise<NextResponse> {
   try {
-    // 使用高德地图的配置接口进行验证
+    // 使用高德地图的 IP 定位接口进行验证
+    // 这个接口对 Web 服务 API 平台的 key 都可用,且不需要安全密钥
     const response = await fetch(
-      `https://restapi.amap.com/v3/config/district?key=${apiKey}&keywords=中国`,
+      `https://restapi.amap.com/v3/ip?key=${apiKey}`,
       {
         method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
     )
 
@@ -54,6 +58,7 @@ async function validateAmapKey(apiKey: string): Promise<NextResponse> {
     // 高德地图响应格式
     // 成功: { status: "1", info: "OK", ... }
     // 失败: { status: "0", info: "INVALID_USER_KEY", infocode: "10001" }
+    // 平台不匹配: { status: "0", info: "USERKEY_PLAT_NOMATCH", infocode: "10009" }
 
     if (data.status === '1') {
       return NextResponse.json({
@@ -62,9 +67,20 @@ async function validateAmapKey(apiKey: string): Promise<NextResponse> {
         provider: 'amap',
       })
     } else {
+      // 针对常见错误提供友好提示
+      let errorMessage = `高德地图 API 验证失败: ${data.info}`
+      
+      if (data.infocode === '10009' || data.info === 'USERKEY_PLAT_NOMATCH') {
+        errorMessage = 'API Key 与平台不匹配。请确保:\n1. 在高德开放平台创建的是 "Web服务" 类型的 Key\n2. 不要使用 "Web端(JS API)" 类型的 Key\n3. 前往 https://console.amap.com/dev/key/app 检查或重新创建'
+      } else if (data.infocode === '10001' || data.info === 'INVALID_USER_KEY') {
+        errorMessage = 'API Key 无效,请检查是否正确复制'
+      } else if (data.infocode === '10003' || data.info === 'DAILY_QUERY_OVER_LIMIT') {
+        errorMessage = 'API Key 今日调用量已超限,请明天再试或升级配额'
+      }
+
       return NextResponse.json({
         success: false,
-        error: `高德地图 API 验证失败: ${data.info}`,
+        error: errorMessage,
         errorCode: data.infocode,
       })
     }
