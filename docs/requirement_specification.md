@@ -19,12 +19,13 @@
 - **🔑 API Key 管理**：用户自主配置 API 密钥
 
 ### 1.4 核心特性
-- **智能语音交互**：支持自然语言输入旅行需求（必备功能）
+- **用户认证体系**：基于 Supabase Auth 的安全登录注册机制
+- **API 密钥管理**：新用户引导配置，老用户自动验证（必备前置功能）
+- **智能语音交互**：支持自然语言输入旅行需求
 - **AI 行程规划**：基于大语言模型 API 生成个性化旅行方案
 - **预算管理**：智能费用预估与语音记账
 - **云端同步**：多设备数据一致性保障
 - **地图集成**：以地图为主的交互界面，可视化行程展示
-- **API 配置界面**：用户自主配置各种 API 密钥
 
 ## 2. 技术架构与模块划分
 
@@ -132,9 +133,9 @@ Docker化:
 
 ## 3. 开发计划与模块顺序
 
-### 3.1 第一阶段：基础框架搭建（优先级：P0）
-**开发顺序**：项目初始化 → M6 → M1
-**开发周期**：1-2 周
+### 3.1 第一阶段：基础认证和配置（优先级：P0）
+**开发顺序**：项目初始化 → M1 → M6 → 用户流程集成
+**开发周期**：2-3 周
 
 **具体任务**：
 1. **项目初始化**：
@@ -143,19 +144,27 @@ Docker化:
    - Tailwind CSS + Ant Design 集成
    - 代码规范和工具链配置
 
-2. **M6 - API 配置模块**：
-   - API 密钥管理界面
-   - 配置项验证功能
-   - 本地存储机制
-   - 配置导入导出
+2. **M1 - 用户认证模块**（重点开发）：
+   - Supabase 集成和配置
+   - 登录注册界面开发
+   - 用户会话管理逻辑
+   - 新老用户识别机制
+   - 路由保护和自动跳转
 
-3. **M1 - 用户认证模块**：
-   - Supabase 集成
-   - 登录注册界面
-   - 用户会话管理
-   - 权限控制
+3. **M6 - API 配置模块**（重点开发）：
+   - API 密钥管理界面设计
+   - 配置项验证功能实现
+   - 配置完整性检查逻辑
+   - 本地加密存储机制
+   - 新用户配置引导流程
 
-**理由**：API 配置是其他模块的前置依赖，用户认证是数据持久化的基础。
+4. **用户流程集成**：
+   - 登录后的路由逻辑
+   - 新用户强制配置流程
+   - 老用户配置验证机制
+   - 用户状态管理优化
+
+**理由**：用户认证是应用的入口，API 配置是功能使用的前提，两者必须优先完成并充分测试用户体验。
 
 ### 3.2 第二阶段：核心界面开发（优先级：P1）
 **开发顺序**：M4 → M2 → 前端界面集成
@@ -224,15 +233,26 @@ Docker化:
 #### 4.1.1 功能规格
 **核心功能**：
 - 用户注册/登录（邮箱、OAuth）
+- 新老用户身份识别和路由分发
 - 用户资料管理
 - 会话状态管理
+- API 配置状态检查
 - 云端数据同步授权
+
+**用户流程设计**：
+1. **应用启动**：检查用户登录状态
+2. **未登录用户**：强制跳转到登录注册界面
+3. **新用户登录**：自动跳转到 API 配置界面
+4. **老用户登录**：验证 API 配置完整性
+   - 配置完整：进入主界面
+   - 配置缺失：跳转到配置界面
 
 **技术实现**：
 - **认证服务**：Supabase Auth
 - **前端实现**：@supabase/auth-helpers-nextjs
 - **状态管理**：Zustand 全局状态
 - **持久化**：localStorage + Supabase Session
+- **路由控制**：Next.js middleware + AuthGuard 组件
 
 #### 4.1.2 接口设计
 ```typescript
@@ -243,6 +263,17 @@ interface AuthService {
   signOut(): Promise<void>
   resetPassword(email: string): Promise<void>
   getCurrentUser(): User | null
+  checkUserConfigStatus(userId: string): Promise<ConfigStatus>
+  redirectAfterAuth(user: User): Promise<string> // 返回重定向路径
+}
+
+// 用户配置状态
+interface ConfigStatus {
+  hasLLMConfig: boolean
+  hasSpeechConfig: boolean
+  hasMapConfig: boolean
+  isConfigComplete: boolean
+  missingConfigs: string[]
 }
 
 // 用户数据模型
@@ -253,14 +284,18 @@ interface User {
   avatar?: string
   locale: string
   currency: string
+  isNewUser: boolean
+  lastLoginAt: string
   createdAt: string
 }
 ```
 
 #### 4.1.3 UI 组件
-- **LoginPage**: 登录注册页面
+- **LoginPage**: 登录注册页面（应用入口）
+- **AuthGuard**: 路由保护组件，检查登录状态
 - **UserProfile**: 用户资料编辑
-- **AuthGuard**: 路由保护组件
+- **ConfigChecker**: 配置完整性检查组件
+- **RedirectHandler**: 登录后路由分发组件
 
 ### 4.2 M2 - 行程规划模块
 
@@ -473,16 +508,24 @@ interface Expense {
 
 #### 4.6.1 功能规格
 **核心功能**：
-- API 密钥管理
-- 服务提供商选择
-- 配置验证和测试
-- 配置导入导出
+- API 密钥管理和存储
+- 服务提供商选择配置
+- 配置验证和实时测试
+- 新用户配置引导流程
+- 配置完整性检查
+- 配置导入导出（可选）
+
+**用户体验设计**：
+1. **新用户引导**：步骤化配置界面，清晰的指导说明
+2. **配置验证**：实时验证 API 密钥有效性
+3. **错误处理**：友好的错误提示和解决建议
+4. **保存机制**：自动保存，防止用户配置丢失
 
 **技术实现**：
-- **存储方式**：localStorage + 加密
-- **配置验证**：API 健康检查
-- **备用方案**：多服务商支持
-- **安全处理**：客户端加密存储
+- **存储方式**：localStorage + 加密（Web Crypto API）
+- **配置验证**：实时 API 健康检查
+- **备用方案**：多服务商支持和降级策略
+- **安全处理**：客户端加密存储，密钥脱敏显示
 
 #### 4.6.2 接口设计
 ```typescript
@@ -510,16 +553,33 @@ interface ConfigService {
   saveConfig(config: APIConfig): Promise<void>
   loadConfig(): Promise<APIConfig | null>
   validateConfig(config: APIConfig): Promise<ValidationResult>
+  checkConfigCompleteness(userId: string): Promise<ConfigStatus>
   exportConfig(): string
   importConfig(configStr: string): Promise<APIConfig>
+  
+  // 新用户引导相关
+  initializeNewUserConfig(userId: string): Promise<void>
+  getConfigProgress(userId: string): Promise<ConfigProgress>
+  markConfigComplete(userId: string): Promise<void>
+}
+
+// 配置进度跟踪
+interface ConfigProgress {
+  totalSteps: number
+  completedSteps: number
+  currentStep: string
+  nextStep?: string
+  isComplete: boolean
 }
 ```
 
 #### 4.6.3 UI 组件
-- **ConfigPanel**: 配置主面板
-- **APIKeyInput**: API 密钥输入组件
-- **ConfigValidator**: 配置验证器
-- **ConfigManager**: 配置导入导出管理器
+- **ConfigWizard**: 新用户配置向导（重点组件）
+- **APIKeyInput**: API 密钥输入组件，支持密钥格式验证
+- **ConfigValidator**: 配置验证器，实时检查配置有效性
+- **ConfigProgress**: 配置进度指示器
+- **ConfigManager**: 配置导入导出管理器（可选功能）
+- **ServiceSelector**: 服务提供商选择组件
 
 ## 5. 系统架构图
 
