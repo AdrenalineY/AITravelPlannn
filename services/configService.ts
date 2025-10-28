@@ -12,6 +12,11 @@ export class ConfigService {
     // 加密敏感字段
     const encryptedLLMKey = await simpleEncrypt(config.llm.apiKey)
     const encryptedSpeechKey = await simpleEncrypt(config.speech.apiKey)
+    const encryptedMapWebServiceKey = await simpleEncrypt(config.map.webServiceKey)
+    const encryptedMapJsApiKey = await simpleEncrypt(config.map.jsApiKey)
+    const encryptedMapSecurityCode = config.map.securityCode 
+      ? await simpleEncrypt(config.map.securityCode)
+      : null
 
     const { error } = await this.supabase
       .from('user_configs')
@@ -26,7 +31,9 @@ export class ConfigService {
         speech_app_id: config.speech.appId,
         speech_api_secret: config.speech.apiSecret,
         map_provider: config.map.provider,
-        map_api_key: config.map.apiKey,
+        map_web_service_key_encrypted: encryptedMapWebServiceKey,
+        map_js_api_key_encrypted: encryptedMapJsApiKey,
+        map_security_code_encrypted: encryptedMapSecurityCode,
         has_completed_setup: true,
         updated_at: new Date().toISOString(),
       })
@@ -54,6 +61,15 @@ export class ConfigService {
       const speechApiKey = data.speech_api_key_encrypted
         ? await simpleDecrypt(data.speech_api_key_encrypted)
         : ''
+      const mapWebServiceKey = data.map_web_service_key_encrypted
+        ? await simpleDecrypt(data.map_web_service_key_encrypted)
+        : ''
+      const mapJsApiKey = data.map_js_api_key_encrypted
+        ? await simpleDecrypt(data.map_js_api_key_encrypted)
+        : ''
+      const mapSecurityCode = data.map_security_code_encrypted
+        ? await simpleDecrypt(data.map_security_code_encrypted)
+        : undefined
 
       return {
         llm: {
@@ -70,7 +86,9 @@ export class ConfigService {
         },
         map: {
           provider: data.map_provider || 'amap',
-          apiKey: data.map_api_key || '',
+          webServiceKey: mapWebServiceKey,
+          jsApiKey: mapJsApiKey,
+          securityCode: mapSecurityCode,
         },
       }
     } catch (error) {
@@ -117,13 +135,15 @@ export class ConfigService {
     }
 
     // 验证地图配置
-    if (!config.map.apiKey) {
-      errors.map = '地图 API 密钥不能为空'
+    if (!config.map.webServiceKey || !config.map.jsApiKey) {
+      errors.map = '地图 API 密钥不完整，需要同时提供 Web服务 Key 和 JS API Key'
     } else {
-      const mapValid = await this.validateMapKey(config.map.provider, config.map.apiKey)
-      if (!mapValid) {
-        errors.map = '地图 API 密钥验证失败，请检查密钥是否正确'
+      // 验证 Web服务 Key
+      const webServiceValid = await this.validateMapKey(config.map.provider, config.map.webServiceKey)
+      if (!webServiceValid) {
+        errors.map = 'Web服务 API Key 验证失败，请检查密钥是否正确'
       }
+      // 注意: JS API Key 的验证需要在前端地图加载时进行,这里无法直接验证
     }
 
     return {
@@ -266,7 +286,9 @@ export class ConfigService {
 
     const hasLLMConfig = !!data.llm_provider && !!data.llm_api_key_encrypted
     const hasSpeechConfig = !!data.speech_provider && !!data.speech_api_key_encrypted
-    const hasMapConfig = !!data.map_provider && !!data.map_api_key
+    const hasMapConfig = !!data.map_provider && 
+                         !!data.map_web_service_key_encrypted && 
+                         !!data.map_js_api_key_encrypted
 
     const missingConfigs: string[] = []
     if (!hasLLMConfig) missingConfigs.push('llm')

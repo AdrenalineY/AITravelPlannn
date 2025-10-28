@@ -13,6 +13,7 @@ import {
   Alert,
   Space,
   Spin,
+  Tag,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -146,30 +147,42 @@ export default function APIConfigPage() {
           }
         }
       } else if (currentStep === 2) {
-        // 验证地图
-        if (!values.map?.apiKey) {
-          message.error('请输入地图 API 密钥')
+        // 验证地图 (检查必填的两个 Key)
+        if (!values.map?.webServiceKey) {
+          message.error('请输入 Web服务 API Key')
+          return false
+        }
+        if (!values.map?.jsApiKey) {
+          message.error('请输入 Web端(JS API) Key')
           return false
         }
 
-        const response = await fetch('/api/validate/map', {
+        // 只验证 Web服务 Key (通过后端 API 调用)
+        // JS API Key 无法在后端验证,因为它专门用于前端 JavaScript
+        const webServiceResponse = await fetch('/api/validate/map', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             provider: values.map.provider || 'amap',
-            apiKey: values.map.apiKey,
+            apiKey: values.map.webServiceKey,
           }),
         })
 
-        const data = await response.json()
+        const webServiceData = await webServiceResponse.json()
         
-        if (data.success) {
-          message.success('地图 API 验证成功')
-          isValid = true
-        } else {
-          message.error(`地图 API 验证失败: ${data.error}`)
+        if (!webServiceData.success) {
+          message.error(`Web服务 API Key 验证失败: ${webServiceData.error}`)
           return false
         }
+
+        // JS API Key 只检查格式(长度应该大于 20 位)
+        if (values.map.jsApiKey.length < 20) {
+          message.error('Web端(JS API) Key 格式不正确,长度过短')
+          return false
+        }
+
+        message.success('地图配置验证成功 (Web服务 Key 已验证, JS API Key 将在地图加载时验证)')
+        isValid = true
       }
 
       return isValid
@@ -372,6 +385,23 @@ export default function APIConfigPage() {
             {currentStep === 2 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">地图服务配置</h3>
+                <Alert
+                  message="高德地图需要两种 API Key"
+                  description={
+                    <div>
+                      <p>1. <strong>Web服务 API Key</strong>: 用于 POI 搜索、路线规划等后端数据获取</p>
+                      <p>2. <strong>Web端(JS API) Key</strong>: 用于前端地图显示和交互</p>
+                      <p className="mt-2">两种 Key 在高德开放平台的<strong>不同应用类型</strong>中创建</p>
+                      <a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener noreferrer">
+                        前往高德开放平台创建 →
+                      </a>
+                    </div>
+                  }
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                />
+
                 <Form.Item
                   label="服务提供商"
                   name={['map', 'provider']}
@@ -385,17 +415,78 @@ export default function APIConfigPage() {
                 </Form.Item>
 
                 <Form.Item
-                  label="API Key"
-                  name={['map', 'apiKey']}
-                  rules={[{ required: true, message: '请输入地图 API 密钥' }]}
-                  extra={
-                    form.getFieldValue(['map', 'provider']) === 'amap' 
-                      ? "⚠️ 请使用「Web服务」平台的Key,不要使用「Web端(JS API)」的Key。申请地址: https://console.amap.com/dev/key/app"
-                      : "用于 POI 搜索和路线规划"
+                  label={
+                    <span>
+                      Web服务 API Key 
+                      <Tag color="blue" className="ml-2">后端数据</Tag>
+                    </span>
                   }
+                  name={['map', 'webServiceKey']}
+                  rules={[{ required: true, message: '请输入 Web服务 API Key' }]}
+                  extra="用于 POI 搜索、路线规划、地理编码等数据获取。创建时选择「Web服务」应用类型"
                 >
-                  <Input.Password placeholder="xxxxxxxxxx" />
+                  <Input.Password placeholder="请输入 Web服务 API Key" />
                 </Form.Item>
+
+                <Form.Item
+                  label={
+                    <span>
+                      Web端(JS API) Key
+                      <Tag color="green" className="ml-2">前端显示</Tag>
+                    </span>
+                  }
+                  name={['map', 'jsApiKey']}
+                  rules={[{ required: true, message: '请输入 Web端(JS API) Key' }]}
+                  extra="用于前端地图显示、标记、交互等。创建时选择「Web端(JS API)」应用类型。注意：此 Key 仅在地图实际加载时验证"
+                >
+                  <Input.Password placeholder="请输入 Web端(JS API) Key" />
+                </Form.Item>
+
+                <Form.Item
+                  label={
+                    <span>
+                      安全密钥 (Security Code)
+                      <Tag color="orange" className="ml-2">可选</Tag>
+                    </span>
+                  }
+                  name={['map', 'securityCode']}
+                  rules={[{ required: false }]}
+                  extra="高德地图 JS API 的安全密钥,在应用管理中配置。推荐填写以提高安全性"
+                >
+                  <Input.Password placeholder="请输入安全密钥（可选）" />
+                </Form.Item>
+
+                <Alert
+                  message="如何配置安全密钥？"
+                  description={
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>访问高德开放平台控制台</li>
+                      <li>找到「Web端(JS API)」应用</li>
+                      <li>在应用设置中找到「安全密钥」配置项</li>
+                      <li>生成或设置安全密钥,然后在此处填写</li>
+                      <li>安全密钥用于防止 API Key 被盗用</li>
+                    </ol>
+                  }
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                />
+
+                <Alert
+                  message="如何创建 API Key？"
+                  description={
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>访问高德开放平台控制台 (https://console.amap.com/dev/key/app)</li>
+                      <li>创建第一个应用,选择「Web服务」类型,获取 Web服务 Key (用于后端验证)</li>
+                      <li>创建第二个应用,选择「Web端(JS API)」类型,获取 JS API Key (用于前端显示)</li>
+                      <li>在 JS API Key 的应用中配置「安全密钥」(可选但推荐)</li>
+                      <li><strong>注意：</strong>配置时只验证 Web服务 Key，JS API Key 将在地图实际加载时验证</li>
+                    </ol>
+                  }
+                  type="warning"
+                  showIcon
+                  className="mt-4"
+                />
               </div>
             )}
 

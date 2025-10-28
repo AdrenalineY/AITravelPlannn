@@ -35,7 +35,9 @@ export interface APIConfig {
   }
   map: {
     provider: 'amap' | 'baidu'
-    apiKey: string
+    webServiceKey: string     // Web服务 API Key (用于后端数据获取)
+    jsApiKey: string           // Web端(JS API) Key (用于前端地图显示)
+    securityCode?: string      // 安全密钥 (可选,用于 JS API 安全验证)
   }
 }
 
