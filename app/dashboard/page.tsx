@@ -243,28 +243,31 @@ export default function DashboardPage() {
           style={{
             borderLeft: '1px solid #f0f0f0',
             overflow: 'hidden',
+            height: '100%',
           }}
         >
-          <Tabs
-            defaultActiveKey="chat"
-            style={{ height: '100%' }}
-            items={[
-              {
-                key: 'chat',
-                label: '💬 AI 助手',
-                children: (
-                  <div className="flex flex-col h-full">
-                    <MessageList messages={chatMessages} />
-                    <MessageInput
-                      onSendMessage={handleSendMessage}
-                      disabled={isGenerating}
-                      placeholder={
-                        isGenerating ? 'AI 正在思考...' : '输入您的旅行需求...'
-                      }
-                    />
-                  </div>
-                ),
-              },
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Tabs
+              defaultActiveKey="chat"
+              style={{ flex: 1, overflow: 'hidden' }}
+              className="chat-tabs"
+              items={[
+                {
+                  key: 'chat',
+                  label: '💬 AI 助手',
+                  children: (
+                    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 64px - 55px)' }}>
+                      <MessageList messages={chatMessages} />
+                      <MessageInput
+                        onSendMessage={handleSendMessage}
+                        disabled={isGenerating}
+                        placeholder={
+                          isGenerating ? 'AI 正在思考...' : '输入您的旅行需求...'
+                        }
+                      />
+                    </div>
+                  ),
+                },
               {
                 key: 'itinerary',
                 label: '📋 行程',
@@ -289,6 +292,7 @@ export default function DashboardPage() {
               },
             ]}
           />
+          </div>
         </Sider>
       </Layout>
 

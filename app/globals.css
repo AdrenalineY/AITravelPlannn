@@ -25,3 +25,32 @@ body {
     )
     rgb(var(--background-start-rgb));
 }
+
+/* 聊天消息列表滚动条样式 */
+.chat-tabs .ant-tabs-content {
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-tabs .ant-tabs-tabpane {
+  height: 100%;
+}
+
+/* 优化滚动条样式 */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

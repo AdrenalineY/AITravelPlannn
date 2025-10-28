@@ -22,7 +22,16 @@ export function MessageList({ messages }: MessageListProps) {
   }, [messages])
 
   return (
-    <div ref={listRef} className="flex-1 overflow-auto p-4 space-y-4">
+    <div 
+      ref={listRef} 
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4"
+      style={{ 
+        height: '100%',
+        maxHeight: '100%',
+        overflowY: 'auto',
+        overflowX: 'hidden'
+      }}
+    >
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-gray-400">
           <RobotOutlined style={{ fontSize: 64, marginBottom: 16 }} />
@@ -40,11 +49,15 @@ export function MessageList({ messages }: MessageListProps) {
                 message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
               }`}
             >
-              {/* 头像 */}
+              {/* 头像 - 修复宽高比 */}
               <Avatar
+                size={40}
                 icon={message.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                 style={{
                   backgroundColor: message.role === 'user' ? '#1890ff' : '#52c41a',
+                  flexShrink: 0,
+                  width: '40px',
+                  height: '40px',
                 }}
               />
 
