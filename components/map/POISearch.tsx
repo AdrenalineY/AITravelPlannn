@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Input, List, Card, Spin, Empty, Tag, Button } from 'antd'
+import { Input, List, Card, Spin, Empty, Tag, Button, message } from 'antd'
 import { SearchOutlined, EnvironmentOutlined, StarOutlined } from '@ant-design/icons'
 import { useMapStore } from '@/store/mapStore'
 import { mapService } from '@/services/mapService'
@@ -33,8 +33,13 @@ export function POISearch() {
     try {
       const results = await mapService.searchPOI(value, center)
       setSearchResults(results)
+      
+      if (results.length === 0) {
+        message.info('未找到相关地点，请尝试其他关键词')
+      }
     } catch (error) {
       console.error('搜索失败:', error)
+      message.error('搜索失败: ' + (error as Error).message)
       setSearchResults([])
     } finally {
       setIsSearching(false)
@@ -42,9 +47,21 @@ export function POISearch() {
   }
 
   const handlePOIClick = (poi: POI) => {
+    console.log('POI clicked:', poi.name, poi.location)
+    
+    // 显示选中提示
+    message.success(`已选中: ${poi.name}`)
+    
+    // 更新选中的 POI
     setSelectedPOI(poi)
+    
+    // 添加标记到地图
     addMarker(poi)
+    
+    // 移动地图中心到选中的 POI
     setCenter(poi.location)
+    
+    // 设置合适的缩放级别
     setZoom(16)
   }
 

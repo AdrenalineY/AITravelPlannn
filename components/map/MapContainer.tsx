@@ -100,11 +100,16 @@ export function MapContainer({ onMapClick, style }: MapContainerProps) {
         mapStyle: 'amap://styles/normal', // 标准样式
       })
 
-      // 添加缩放控件
-      map.addControl(new window.AMap.Scale())
-      map.addControl(new window.AMap.ToolBar({
-        position: { top: '10px', right: '10px' }
-      }))
+      // 添加缩放控件 (高德地图 2.0 版本使用新的控件方式)
+      if (window.AMap.Control && window.AMap.Control.Scale) {
+        map.addControl(new window.AMap.Control.Scale())
+      }
+      
+      if (window.AMap.Control && window.AMap.Control.ToolBar) {
+        map.addControl(new window.AMap.Control.ToolBar({
+          position: { top: '10px', right: '10px' }
+        }))
+      }
 
       // 地图点击事件
       map.on('click', (e: any) => {
@@ -137,8 +142,8 @@ export function MapContainer({ onMapClick, style }: MapContainerProps) {
   useEffect(() => {
     if (!amapInstanceRef.current) return
 
-    amapInstanceRef.current.setCenter([center.lng, center.lat])
-    amapInstanceRef.current.setZoom(zoom)
+    // 使用带动画的平滑移动
+    amapInstanceRef.current.setZoomAndCenter(zoom, [center.lng, center.lat], false, 500)
   }, [center, zoom])
 
   // 更新标记
@@ -151,17 +156,20 @@ export function MapContainer({ onMapClick, style }: MapContainerProps) {
 
     // 添加新标记
     markers.forEach((poi) => {
+      // 创建 SVG 图标（使用 URL 编码避免 btoa 的 Latin1 限制）
+      const svgIcon = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+          <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="white" stroke-width="2"/>
+          <circle cx="16" cy="14" r="5" fill="white"/>
+        </svg>
+      `.trim()
+      
       const marker = new window.AMap.Marker({
         position: [poi.location.lng, poi.location.lat],
         title: poi.name,
         icon: new window.AMap.Icon({
           size: new window.AMap.Size(32, 32),
-          image: 'data:image/svg+xml;base64,' + btoa(`
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-              <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="white" stroke-width="2"/>
-              <text x="16" y="21" text-anchor="middle" font-size="16" fill="white">📍</text>
-            </svg>
-          `),
+          image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon),
           imageSize: new window.AMap.Size(32, 32),
         }),
         offset: new window.AMap.Pixel(-16, -32),
