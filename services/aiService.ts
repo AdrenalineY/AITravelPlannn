@@ -276,6 +276,13 @@ ${additionalNotes ? `其他要求: ${additionalNotes}` : ''}
       throw new Error('行程数据解析失败,请重试')
     }
   }
+
+  /**
+   * 公开的对话补全方法 (用于 Agent 等外部调用)
+   */
+  async chat(messages: Array<{ role: string; content: string }>): Promise<string> {
+    return this.chatCompletion(messages)
+  }
 }
 
 export const aiService = new AIService()

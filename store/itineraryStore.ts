@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Itinerary, ChatMessage, TravelPreferences } from '@/types'
+import type { Itinerary, ChatMessage, TravelPreferences, ConversationSession, AgentMessage, ItineraryCard } from '@/types'
 
 interface ItineraryState {
   // 当前行程
@@ -23,6 +23,20 @@ interface ItineraryState {
   // 加载状态
   isLoadingItinerary: boolean
   isSaving: boolean
+
+  // ========== Agent 相关状态 ==========
+  // 当前会话
+  currentSession: ConversationSession | null
+  // Agent 运行状态
+  isAgentRunning: boolean
+  // Agent 消息流
+  agentMessages: AgentMessage[]
+  // 当前 Agent 运行 ID
+  currentAgentRunId: string | null
+  // 待确认问题
+  pendingQuestions: string[]
+  // 提取的行程卡片
+  extractedPlanCard: ItineraryCard | null
   
   // Actions
   setCurrentItinerary: (itinerary: Itinerary | null) => void
@@ -43,6 +57,16 @@ interface ItineraryState {
   setIsLoadingItinerary: (isLoading: boolean) => void
   setIsSaving: (isSaving: boolean) => void
   
+  // Agent Actions
+  setCurrentSession: (session: ConversationSession | null) => void
+  setIsAgentRunning: (isRunning: boolean) => void
+  setAgentMessages: (messages: AgentMessage[]) => void
+  addAgentMessage: (message: AgentMessage) => void
+  setCurrentAgentRunId: (runId: string | null) => void
+  setPendingQuestions: (questions: string[]) => void
+  setExtractedPlanCard: (card: ItineraryCard | null) => void
+  clearAgentState: () => void
+  
   reset: () => void
 }
 
@@ -56,6 +80,13 @@ const initialState = {
   editingDayIndex: null,
   isLoadingItinerary: false,
   isSaving: false,
+  // Agent state
+  currentSession: null,
+  isAgentRunning: false,
+  agentMessages: [],
+  currentAgentRunId: null,
+  pendingQuestions: [],
+  extractedPlanCard: null,
 }
 
 export const useItineraryStore = create<ItineraryState>()(
@@ -110,6 +141,25 @@ export const useItineraryStore = create<ItineraryState>()(
       
       setIsLoadingItinerary: (isLoading) => set({ isLoadingItinerary: isLoading }),
       setIsSaving: (isSaving) => set({ isSaving }),
+      
+      // Agent Actions
+      setCurrentSession: (session) => set({ currentSession: session }),
+      setIsAgentRunning: (isRunning) => set({ isAgentRunning: isRunning }),
+      setAgentMessages: (messages) => set({ agentMessages: messages }),
+      addAgentMessage: (message) =>
+        set((state) => ({
+          agentMessages: [...state.agentMessages, message],
+        })),
+      setCurrentAgentRunId: (runId) => set({ currentAgentRunId: runId }),
+      setPendingQuestions: (questions) => set({ pendingQuestions: questions }),
+      setExtractedPlanCard: (card) => set({ extractedPlanCard: card }),
+      clearAgentState: () =>
+        set({
+          isAgentRunning: false,
+          agentMessages: [],
+          currentAgentRunId: null,
+          pendingQuestions: [],
+        }),
       
       reset: () => set(initialState),
     }),

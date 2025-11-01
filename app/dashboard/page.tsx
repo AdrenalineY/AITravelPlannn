@@ -24,6 +24,7 @@ import { authService } from '@/services/authService'
 import { aiService } from '@/services/aiService'
 import { mapService } from '@/services/mapService'
 import { itineraryService } from '@/services/itineraryService'
+import { agentServiceClient } from '@/services/agentServiceClient'
 import type { TravelRequirements, ChatMessage } from '@/types'
 
 const { Header, Sider, Content } = Layout
@@ -41,6 +42,13 @@ export default function DashboardPage() {
     addChatMessage,
     setCurrentItinerary,
     setIsGenerating,
+    currentSession,
+    setCurrentSession,
+    isAgentRunning,
+    setIsAgentRunning,
+    setAgentMessages,
+    setExtractedPlanCard,
+    setPendingQuestions,
   } = useItineraryStore()
 
   const [collapsed, setCollapsed] = useState(false)
@@ -48,29 +56,67 @@ export default function DashboardPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [showNewItineraryModal, setShowNewItineraryModal] = useState(false)
   const [form] = Form.useForm()
+  const [configLoading, setConfigLoading] = useState(true)
+  const { setConfig } = useConfigStore()
 
-  // 检查认证和配置
+  // 检查认证和加载配置
   useEffect(() => {
-    if (!user) {
-      router.push('/auth/login')
-      return
+    const initializeConfig = async () => {
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
+
+      try {
+        setConfigLoading(true)
+        
+        // 从数据库加载配置
+        const { configService } = await import('@/services/configService')
+        const loadedConfig = await configService.loadConfig(user.id)
+        
+        if (!loadedConfig) {
+          message.warning('配置加载失败，请重新保存配置')
+          router.push('/setup/api-config')
+          return
+        }
+        
+        if (!loadedConfig.llm?.apiKey || !loadedConfig.map?.webServiceKey) {
+          message.warning('请先配置 API 密钥才能使用 Agent 功能')
+          router.push('/setup/api-config')
+          return
+        }
+
+        // 更新 store
+        setConfig(loadedConfig)
+
+        // 初始化服务
+        if (loadedConfig.llm?.apiKey) {
+          aiService.setConfig({
+            provider: loadedConfig.llm.provider,
+            apiKey: loadedConfig.llm.apiKey,
+            baseUrl: loadedConfig.llm.baseUrl,
+            model: loadedConfig.llm.model,
+          })
+        }
+        if (loadedConfig.map?.webServiceKey) {
+          mapService.setWebServiceKey(loadedConfig.map.webServiceKey)
+        }
+        
+        console.log('[Dashboard] 配置加载成功:', {
+          hasLLMKey: !!loadedConfig.llm?.apiKey,
+          hasMapKey: !!loadedConfig.map?.webServiceKey,
+        })
+      } catch (error: any) {
+        console.error('[Dashboard] 配置加载失败:', error)
+        message.error('加载配置失败: ' + error.message)
+        router.push('/setup/api-config')
+      } finally {
+        setConfigLoading(false)
+      }
     }
 
-    // 初始化服务
-    if (config) {
-      if (config.llm?.apiKey) {
-        aiService.setConfig({
-          provider: config.llm.provider,
-          apiKey: config.llm.apiKey,
-          baseUrl: config.llm.baseUrl,
-          model: config.llm.model,
-        })
-      }
-      if (config.map?.webServiceKey) {
-        mapService.setWebServiceKey(config.map.webServiceKey)
-      }
-    }
-  }, [user, config, router])
+    initializeConfig()
+  }, [user, router])
 
   // 处理拖拽调整面板宽度
   const handleMouseMove = (e: MouseEvent) => {
@@ -104,7 +150,7 @@ export default function DashboardPage() {
     router.push('/auth/login')
   }
 
-  // 发送消息
+  // 发送消息 (仅使用 Agent 模式)
   const handleSendMessage = async (content: string) => {
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -114,25 +160,84 @@ export default function DashboardPage() {
     }
     addChatMessage(userMessage)
 
-    setIsGenerating(true)
+    // 使用 Agent 模式
+    setIsAgentRunning(true)
     try {
-      const response = await aiService.chatWithAI(content, {
-        conversationHistory: chatMessages,
-        itineraryId: currentItinerary?.id,
+      console.log('[Dashboard] 启动 Agent 模式...')
+      
+      const result = await agentServiceClient.runAgent({
+        message: content,
+        sessionId: currentSession?.id,
+        maxTurns: 10,
       })
 
-      const assistantMessage: ChatMessage = {
-        id: `msg-${Date.now()}-ai`,
-        role: 'assistant',
-        content: response,
-        timestamp: new Date().toISOString(),
+      console.log('[Dashboard] Agent 运行完成:', result)
+
+      if (result.success && result.finalAnswer) {
+        // 保存会话 ID
+        if (result.sessionId && !currentSession) {
+          const session = await agentServiceClient.getSession(result.sessionId)
+          setCurrentSession(session)
+        }
+
+        // 显示 Agent 的最终答案
+        const assistantMessage: ChatMessage = {
+          id: `msg-${Date.now()}-agent`,
+          role: 'assistant',
+          content: result.finalAnswer,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            type: 'agent_answer',
+            agentRunId: result.agentRunId,
+          },
+        }
+        addChatMessage(assistantMessage)
+
+        // 保存 Agent 消息流
+        if (result.messages && result.messages.length > 0) {
+          setAgentMessages(result.messages)
+        }
+
+        // 如果提取到了行程卡片
+        if (result.planExtracted) {
+          setExtractedPlanCard(result.planExtracted)
+          setPendingQuestions(result.planExtracted.pendingQuestions || [])
+          
+          // 显示提示
+          if (result.planExtracted.pendingQuestions && result.planExtracted.pendingQuestions.length > 0) {
+            message.info(`还有 ${result.planExtracted.pendingQuestions.length} 个问题需要确认`)
+          }
+        }
+
+        // 如果生成了新的行程
+        if (result.itineraryId && !currentItinerary) {
+          message.success('行程已自动保存！')
+        }
+      } else {
+        // 如果是配置错误,跳转到配置页面
+        if (result.error?.includes('API 密钥') || result.error?.includes('配置')) {
+          message.warning(result.error + ' - 正在跳转到配置页面...')
+          setTimeout(() => {
+            router.push('/setup/api-config')
+          }, 1500)
+        } else {
+          message.error(result.error || 'Agent 运行失败')
+        }
       }
-      addChatMessage(assistantMessage)
-    } catch (error) {
-      message.error('AI 响应失败,请稍后重试')
-      console.error('AI chat error:', error)
+    } catch (error: any) {
+      // 检查是否是配置相关错误
+      const errorMsg = error.message || error.toString() || '未知错误'
+      if (errorMsg.includes('API 密钥') || errorMsg.includes('配置') || error.redirectTo) {
+        message.warning('请先配置 API 密钥 - 正在跳转到配置页面...')
+        setTimeout(() => {
+          router.push('/setup/api-config')
+        }, 1500)
+      } else {
+        message.error('Agent 运行失败: ' + errorMsg)
+      }
+      console.error('[Dashboard] Agent error:', error)
     } finally {
-      setIsGenerating(false)
+      setIsAgentRunning(false)
     }
   }
 
@@ -178,6 +283,18 @@ export default function DashboardPage() {
   }
 
   if (!user) return null
+
+  // 配置加载中
+  if (configLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <div className="text-lg text-gray-600">正在加载配置...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Layout className="min-h-screen">
@@ -254,15 +371,28 @@ export default function DashboardPage() {
               items={[
                 {
                   key: 'chat',
-                  label: '💬 AI 助手',
+                  label: '🤖 AI 助手',
                   children: (
                     <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 64px - 55px)' }}>
+                      {/* Agent 会话信息栏 */}
+                      {currentSession && (
+                        <div className="px-4 py-2 bg-blue-50 border-b flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-blue-600">🤖 Agent 智能规划模式</span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            会话: {currentSession.title || currentSession.id.slice(0, 8)}
+                          </span>
+                        </div>
+                      )}
                       <MessageList messages={chatMessages} />
                       <MessageInput
                         onSendMessage={handleSendMessage}
-                        disabled={isGenerating}
+                        disabled={isAgentRunning}
                         placeholder={
-                          isGenerating ? 'AI 正在思考...' : '输入您的旅行需求...'
+                          isAgentRunning
+                            ? '🤖 Agent 正在规划中，请稍候...'
+                            : '告诉我您的旅行计划，Agent 会自动为您规划...'
                         }
                       />
                     </div>

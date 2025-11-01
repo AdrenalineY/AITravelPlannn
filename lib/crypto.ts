@@ -132,13 +132,13 @@ export async function getEncryptionKey(userId: string, password: string): Promis
 }
 
 /**
- * 简单加密（用于不需要用户密码的场景，使用固定的客户端密钥）
+ * 简单加密（用于不需要用户密码的场景，使用用户ID作为密钥）
  */
-export async function simpleEncrypt(text: string): Promise<string> {
-  // 使用设备指纹作为密钥源（简化版）
-  const deviceId = getOrCreateDeviceId()
+export async function simpleEncrypt(text: string, userId?: string): Promise<string> {
+  // 使用用户ID作为密钥源，如果没有则使用设备ID
+  const keySource = userId || getOrCreateDeviceId()
   const salt = generateSalt()
-  const key = await deriveKey(deviceId, salt)
+  const key = await deriveKey(keySource, salt)
   
   const encrypted = await encrypt(text, key)
   
@@ -149,26 +149,35 @@ export async function simpleEncrypt(text: string): Promise<string> {
 /**
  * 简单解密
  */
-export async function simpleDecrypt(encryptedData: string): Promise<string> {
+export async function simpleDecrypt(encryptedData: string, userId?: string): Promise<string> {
   const [saltBase64, encrypted] = encryptedData.split('.')
   const salt = Uint8Array.from(atob(saltBase64), (c) => c.charCodeAt(0))
   
-  const deviceId = getOrCreateDeviceId()
-  const key = await deriveKey(deviceId, salt)
+  // 使用用户ID作为密钥源，如果没有则使用设备ID
+  const keySource = userId || getOrCreateDeviceId()
+  const key = await deriveKey(keySource, salt)
   
   return decrypt(encrypted, key)
 }
 
 /**
  * 获取或创建设备 ID
+ * 在浏览器中使用 localStorage，在服务器端使用环境变量
  */
 function getOrCreateDeviceId(): string {
-  let deviceId = localStorage.getItem('device_id')
-  
-  if (!deviceId) {
-    deviceId = crypto.randomUUID()
-    localStorage.setItem('device_id', deviceId)
+  // 检查是否在浏览器环境
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    let deviceId = localStorage.getItem('device_id')
+    
+    if (!deviceId) {
+      deviceId = crypto.randomUUID()
+      localStorage.setItem('device_id', deviceId)
+    }
+    
+    return deviceId
   }
   
-  return deviceId
+  // 服务器端环境：使用环境变量或固定值
+  const serverKey = process.env.CRYPTO_SERVER_KEY || 'default-server-encryption-key-change-in-production'
+  return serverKey
 }

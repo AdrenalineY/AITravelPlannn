@@ -221,6 +221,9 @@ export default function APIConfigPage() {
       await configService.saveConfig(user!.id, finalConfig)
       await configService.markConfigComplete(user!.id)
 
+      // 更新 ConfigStore 中的配置
+      setConfig(finalConfig)
+
       message.success('配置保存成功!')
       
       // 更新用户配置状态
@@ -229,7 +232,10 @@ export default function APIConfigPage() {
         user: user ? { ...user, configStatus, isNewUser: false } : null,
       })
 
-      router.push('/dashboard')
+      // 延迟跳转,确保状态更新完成
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 500)
     } catch (error: any) {
       message.error('保存配置失败: ' + error.message)
     } finally {

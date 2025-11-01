@@ -1,21 +1,29 @@
 import { createClient } from '@/lib/supabase/client'
-import { simpleEncrypt, simpleDecrypt } from '@/lib/crypto'
+import { simpleDecrypt } from '@/lib/crypto'
 import type { APIConfig, ConfigStatus, ConfigProgress, ValidationResult } from '@/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class ConfigService {
-  private supabase = createClient()
+  private supabase: SupabaseClient
+  
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabase = supabaseClient || createClient()
+  }
 
   /**
    * 保存配置
    */
   async saveConfig(userId: string, config: APIConfig): Promise<void> {
-    // 加密敏感字段
-    const encryptedLLMKey = await simpleEncrypt(config.llm.apiKey)
-    const encryptedSpeechKey = await simpleEncrypt(config.speech.apiKey)
-    const encryptedMapWebServiceKey = await simpleEncrypt(config.map.webServiceKey)
-    const encryptedMapJsApiKey = await simpleEncrypt(config.map.jsApiKey)
+    // 动态导入加密函数（避免服务器端执行时的问题）
+    const { simpleEncrypt } = await import('@/lib/crypto')
+    
+    // 使用用户ID作为加密密钥，确保前后端一致
+    const encryptedLLMKey = await simpleEncrypt(config.llm.apiKey, userId)
+    const encryptedSpeechKey = await simpleEncrypt(config.speech.apiKey, userId)
+    const encryptedMapWebServiceKey = await simpleEncrypt(config.map.webServiceKey, userId)
+    const encryptedMapJsApiKey = await simpleEncrypt(config.map.jsApiKey, userId)
     const encryptedMapSecurityCode = config.map.securityCode 
-      ? await simpleEncrypt(config.map.securityCode)
+      ? await simpleEncrypt(config.map.securityCode, userId)
       : null
 
     const { error } = await this.supabase
@@ -45,31 +53,50 @@ export class ConfigService {
    * 加载配置
    */
   async loadConfig(userId: string): Promise<APIConfig | null> {
+    console.log('[ConfigService] 正在加载配置, userId:', userId)
+    
     const { data, error } = await this.supabase
       .from('user_configs')
       .select('*')
       .eq('user_id', userId)
       .single()
 
-    if (error || !data) return null
+    if (error) {
+      console.error('[ConfigService] 数据库查询错误:', error)
+      return null
+    }
+    
+    if (!data) {
+      console.log('[ConfigService] 未找到配置数据')
+      return null
+    }
+
+    console.log('[ConfigService] 找到配置记录, has_completed_setup:', data.has_completed_setup)
 
     try {
-      // 解密敏感字段
+      // 使用用户ID作为解密密钥，确保前后端一致
       const llmApiKey = data.llm_api_key_encrypted
-        ? await simpleDecrypt(data.llm_api_key_encrypted)
+        ? await simpleDecrypt(data.llm_api_key_encrypted, userId)
         : ''
       const speechApiKey = data.speech_api_key_encrypted
-        ? await simpleDecrypt(data.speech_api_key_encrypted)
+        ? await simpleDecrypt(data.speech_api_key_encrypted, userId)
         : ''
       const mapWebServiceKey = data.map_web_service_key_encrypted
-        ? await simpleDecrypt(data.map_web_service_key_encrypted)
+        ? await simpleDecrypt(data.map_web_service_key_encrypted, userId)
         : ''
       const mapJsApiKey = data.map_js_api_key_encrypted
-        ? await simpleDecrypt(data.map_js_api_key_encrypted)
+        ? await simpleDecrypt(data.map_js_api_key_encrypted, userId)
         : ''
       const mapSecurityCode = data.map_security_code_encrypted
-        ? await simpleDecrypt(data.map_security_code_encrypted)
+        ? await simpleDecrypt(data.map_security_code_encrypted, userId)
         : undefined
+
+      console.log('[ConfigService] 配置解密成功, 密钥状态:', {
+        hasLLMKey: !!llmApiKey,
+        hasMapWebKey: !!mapWebServiceKey,
+        hasMapJsKey: !!mapJsApiKey,
+        hasSpeechKey: !!speechApiKey,
+      })
 
       return {
         llm: {
@@ -92,7 +119,7 @@ export class ConfigService {
         },
       }
     } catch (error) {
-      console.error('解密配置失败:', error)
+      console.error('[ConfigService] 解密配置失败:', error)
       return null
     }
   }
