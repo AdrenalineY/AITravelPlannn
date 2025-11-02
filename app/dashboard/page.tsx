@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   UserOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons'
 import { MapContainer } from '@/components/map/MapContainer'
 import { POISearch } from '@/components/map/POISearch'
@@ -25,6 +26,7 @@ import { aiService } from '@/services/aiService'
 import { mapService } from '@/services/mapService'
 import { itineraryService } from '@/services/itineraryService'
 import { agentServiceClient } from '@/services/agentServiceClient'
+import { itineraryCardService } from '@/services/itineraryCardService'
 import type { TravelRequirements, ChatMessage } from '@/types'
 
 const { Header, Sider, Content } = Layout
@@ -206,6 +208,17 @@ export default function DashboardPage() {
           setExtractedPlanCard(result.planExtracted)
           setPendingQuestions(result.planExtracted.pendingQuestions || [])
           
+          // 保存到数据库
+          try {
+            console.log('[Dashboard] Saving itinerary card to database...')
+            await itineraryCardService.create(result.planExtracted)
+            console.log('[Dashboard] Itinerary card saved successfully')
+            message.success('行程已自动保存!')
+          } catch (saveError: any) {
+            console.error('[Dashboard] Failed to save itinerary card:', saveError)
+            message.warning('行程生成成功,但保存失败: ' + saveError.message)
+          }
+          
           // 显示提示
           if (result.planExtracted.pendingQuestions && result.planExtracted.pendingQuestions.length > 0) {
             message.info(`还有 ${result.planExtracted.pendingQuestions.length} 个问题需要确认`)
@@ -312,6 +325,12 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold m-0">AI 旅行规划师</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            icon={<UnorderedListOutlined />}
+            onClick={() => router.push('/itineraries')}
+          >
+            我的行程
+          </Button>
           <Button
             icon={<SettingOutlined />}
             onClick={() => router.push('/setup/api-config')}

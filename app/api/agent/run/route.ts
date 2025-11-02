@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { sessionId, message, maxTurns = AgentConfig.MAX_TURNS } = body
 
+    // 🔍 调试: 打印 Agent 配置
+    console.log('[Agent API] Agent Configuration:')
+    console.log('  - MAX_TURNS (config):', AgentConfig.MAX_TURNS)
+    console.log('  - WARNING_TURN (config):', AgentConfig.WARNING_TURN)
+    console.log('  - maxTurns (from request):', maxTurns)
+    console.log('  - ENV MAX_TURNS:', process.env.NEXT_PUBLIC_AGENT_MAX_TURNS)
+    console.log('  - ENV WARNING_TURN:', process.env.NEXT_PUBLIC_AGENT_WARNING_TURN)
+    
     console.log('[Agent API] 收到请求:', { userId: user.id, sessionId, messageLength: message?.length })
 
     if (!message || typeof message !== 'string') {

@@ -36,6 +36,31 @@ body {
   height: 100%;
 }
 
+/* 行程卡片样式 */
+.itinerary-card {
+  transition: all 0.3s ease;
+}
+
+.itinerary-card:hover {
+  transform: translateY(-4px);
+}
+
+.itinerary-card-compact {
+  transition: all 0.2s ease;
+}
+
+.itinerary-card-compact:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.card-actions button {
+  transition: all 0.2s ease;
+}
+
+.card-actions button:hover {
+  transform: scale(1.1);
+}
+
 /* 优化滚动条样式 */
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;

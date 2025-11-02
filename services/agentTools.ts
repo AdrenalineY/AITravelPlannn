@@ -368,7 +368,7 @@ export class AgentTools {
   }
 
   /**
-   * 从自然语言计划中提取结构化数据
+   * 从自然语言计划中提取结构化数据 - 增强版
    * 对应 Python 版本的 extract_plan_structure
    */
   static async extractPlanStructure(
@@ -379,95 +379,280 @@ export class AgentTools {
       budget?: number
       startDate?: string
       endDate?: string
+      sessionId?: string
+      userId?: string
     } = {}
   ): Promise<ItineraryCard | null> {
     try {
-      console.log('[AgentTools] extractPlanStructure')
+      console.log('[AgentTools] extractPlanStructure - Enhanced Version')
+      const startTime = Date.now()
 
-      const prompt = `你是一个数据格式化专家。请将以下旅行计划转换为结构化的 JSON 格式。
+      const prompt = `你是一个专业的旅行数据提取专家。请仔细阅读以下旅行计划,提取所有结构化信息。
 
-旅行计划内容:
+【旅行计划内容】
 ${naturalLanguagePlan}
 
-已知上下文:
+【已知上下文】
 - 目的地: ${context.destination || '未知'}
 - 人数: ${context.travelers || '未知'}
 - 预算: ${context.budget || '未知'}
 - 开始日期: ${context.startDate || '未知'}
 - 结束日期: ${context.endDate || '未知'}
 
-请严格按照以下 TypeScript 接口格式输出 JSON(只输出JSON,不要其他文字):
+【提取要求】
+请严格按照以下 JSON Schema 提取信息。**只输出JSON,不要任何其他文字**:
 
+\`\`\`json
 {
-  "title": "旅行标题",
-  "destination": "目的地",
+  "title": "行程标题(如:上海3日亲子游)",
+  "destination": "主要目的地",
+  "cities": ["涉及的城市1", "城市2"],
   "startDate": "YYYY-MM-DD",
   "endDate": "YYYY-MM-DD",
-  "travelers": 人数,
-  "preferences": ["偏好1", "偏好2"],
-  "totalBudget": 预算金额,
+  "totalDays": 天数(整数),
+  "totalNights": 晚数(整数),
+  
+  "travelers": 总人数,
+  "travelersDetail": {
+    "adults": 成人数,
+    "children": 儿童数,
+    "ages": [年龄列表]
+  },
+  
+  "preferences": ["偏好标签"],
+  "travelStyle": "旅行风格",
+  "theme": "行程主题",
+  "specialRequests": ["特殊需求"],
+  
+  "totalBudget": 总预算,
+  "budgetPerPerson": 人均预算,
+  "currency": "CNY",
   "estimatedCost": {
-    "total": 总估算,
+    "total": 总费用,
+    "perPerson": 人均费用,
     "breakdown": [
-      {"category": "transport", "amount": 金额, "notes": "说明"},
-      {"category": "accommodation", "amount": 金额},
-      {"category": "food", "amount": 金额},
-      {"category": "activity", "amount": 金额}
+      {
+        "category": "transport|accommodation|food|activity|shopping",
+        "amount": 金额,
+        "percentage": 占比(0-100),
+        "notes": "说明",
+        "items": [
+          {"name": "项目名", "amount": 金额, "quantity": 数量}
+        ]
+      }
     ]
   },
+  
+  "accommodation": {
+    "region": "住宿区域",
+    "type": "酒店类型",
+    "recommendations": [
+      {
+        "name": "酒店名称",
+        "location": "位置",
+        "rating": 评分,
+        "pricePerNight": 每晚价格,
+        "totalNights": 晚数,
+        "totalCost": 总价
+      }
+    ]
+  },
+  
   "days": [
     {
+      "dayNumber": 1,
       "date": "YYYY-MM-DD",
-      "summary": "当天概要",
+      "title": "当日标题",
+      "summary": "当日概要",
+      "highlights": ["亮点1", "亮点2"],
       "segments": [
         {
-          "time": "09:00",
-          "type": "activity",
-          "title": "活动名称",
-          "location": "地点",
-          "description": "描述",
-          "costEstimate": 费用
+          "order": 1,
+          "time": "09:00" 或 "09:00-12:00",
+          "type": "transport|activity|meal|rest|accommodation",
+          "title": "活动标题",
+          "location": "地点名称",
+          "address": "详细地址",
+          "description": "详细描述",
+          "duration": 时长(分钟),
+          "costEstimate": 费用,
+          "rating": 评分,
+          "tips": ["小贴士"],
+          "distanceInfo": {
+            "from": "起点",
+            "to": "终点",
+            "mode": "walk|subway|bus|taxi|car",
+            "duration": "时长文本",
+            "distance": "距离文本",
+            "cost": 费用
+          },
+          "bookingInfo": {
+            "required": true/false,
+            "advanceTime": "提前预订时间"
+          }
         }
       ]
     }
   ],
-  "pendingQuestions": ["待确认问题1", "待确认问题2"]
+  
+  "tips": {
+    "bestTime": "最佳旅行时间",
+    "weather": "天气提示",
+    "transportation": ["交通建议"],
+    "packing": ["打包清单"],
+    "safety": ["安全提示"],
+    "cultural": ["文化习俗"]
+  },
+  
+  "foodRecommendations": [
+    {
+      "name": "餐厅名",
+      "location": "位置",
+      "cuisine": "菜系",
+      "signature": ["招牌菜"],
+      "avgCost": 人均消费,
+      "rating": 评分,
+      "mustTry": true/false
+    }
+  ],
+  
+  "shoppingSpots": [
+    {
+      "name": "购物点",
+      "location": "位置",
+      "category": "类别",
+      "highlights": ["亮点"]
+    }
+  ],
+  
+  "transportationSummary": {
+    "localTransport": {
+      "mainModes": ["主要交通方式"],
+      "estimatedCost": 预估费用
+    }
+  },
+  
+  "pendingQuestions": ["待确认问题"],
+  "tags": ["标签1", "标签2"]
 }
+\`\`\`
 
-注意:
-1. 如果信息缺失,使用 null 并添加到 pendingQuestions
-2. 日期必须是 ISO 格式
-3. category 只能是: transport, accommodation, food, activity
-4. type 只能是: transport, activity, meal, rest
-5. 金额使用数字类型
-`
+【提取规则】
+1. **时间信息**: 严格使用 YYYY-MM-DD 格式,segments的time使用 HH:mm 或 HH:mm-HH:mm 格式
+2. **金额**: 统一为数字类型(元),不要包含货币符号
+3. **枚举值**: category和type必须使用指定的枚举值
+4. **评分**: 0-5的浮点数
+5. **缺失信息**: 使用null,并添加到pendingQuestions数组
+6. **数组**: 即使只有一个元素也要使用数组格式
+7. **segments的order**: 从1开始递增
+8. **计算字段**: totalDays, totalNights, perPerson, percentage 等需要计算
+9. **提取原则**: 尽可能完整提取,但不要编造不存在的信息
+
+【输出格式】
+直接输出JSON,不要markdown代码块标记,不要任何解释文字。`
 
       const response = await aiService.chat([
-        { role: 'system', content: '你是一个严格的 JSON 格式化工具,只输出有效的 JSON。' },
+        { role: 'system', content: '你是一个严格的JSON提取工具。只输出有效的JSON,不输出任何其他内容。' },
         { role: 'user', content: prompt }
       ])
 
-      // 提取 JSON
-      const jsonMatch = response.match(/\{[\s\S]*\}/)
+      console.log('[AgentTools] LLM response length:', response.length)
+
+      // 提取 JSON (支持多种格式)
+      let jsonStr = response.trim()
+      
+      // 移除可能的 markdown 代码块标记
+      jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '')
+      
+      // 尝试找到 JSON 对象
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
-        console.error('[AgentTools] No JSON found in response')
+        console.error('[AgentTools] No valid JSON found in response')
+        console.error('[AgentTools] Response preview:', response.substring(0, 500))
         return null
       }
 
       const planData = JSON.parse(jsonMatch[0])
       
-      // 添加 ID
+      // 计算总天数和晚数(如果未提供)
+      let totalDays = planData.totalDays
+      let totalNights = planData.totalNights
+      
+      if (!totalDays && planData.startDate && planData.endDate) {
+        const start = new Date(planData.startDate)
+        const end = new Date(planData.endDate)
+        totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        totalNights = totalDays - 1
+      } else if (!totalNights && totalDays) {
+        totalNights = Math.max(0, totalDays - 1)
+      }
+      
+      // 计算人均费用(如果未提供)
+      let budgetPerPerson = planData.budgetPerPerson
+      if (!budgetPerPerson && planData.totalBudget && planData.travelers) {
+        budgetPerPerson = Math.round(planData.totalBudget / planData.travelers)
+      }
+      
+      // 计算费用占比(如果未提供)
+      if (planData.estimatedCost?.breakdown) {
+        const total = planData.estimatedCost.total || 0
+        planData.estimatedCost.breakdown.forEach((item: any) => {
+          if (!item.percentage && total > 0) {
+            item.percentage = Math.round((item.amount / total) * 100)
+          }
+        })
+        
+        // 计算人均费用
+        if (!planData.estimatedCost.perPerson && planData.travelers) {
+          planData.estimatedCost.perPerson = Math.round(planData.estimatedCost.total / planData.travelers)
+        }
+      }
+      
+      // 为每个segment添加order(如果未提供)
+      if (planData.days) {
+        planData.days.forEach((day: any) => {
+          if (day.segments) {
+            day.segments.forEach((seg: any, idx: number) => {
+              if (!seg.order) {
+                seg.order = idx + 1
+              }
+            })
+          }
+        })
+      }
+      
+      // 构建完整的 ItineraryCard
+      // 注意: 不需要生成 id,让数据库自动生成 UUID
       const itineraryCard: ItineraryCard = {
-        id: `plan_${Date.now()}`,
+        id: crypto.randomUUID(), // 生成 UUID 格式的 ID
+        sessionId: context.sessionId,
+        userId: context.userId,
         ...planData,
-        rawPlan: naturalLanguagePlan.substring(0, 500)
+        totalDays: totalDays || planData.days?.length || 1,
+        totalNights,
+        budgetPerPerson,
+        currency: planData.currency || 'CNY',
+        rawPlan: naturalLanguagePlan.substring(0, 500),
+        fullPlan: naturalLanguagePlan,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1
       }
 
-      console.log('[AgentTools] Plan structure extracted successfully')
+      console.log(`[AgentTools] Plan extraction completed in ${Date.now() - startTime}ms`)
+      console.log('[AgentTools] Extracted plan:', {
+        title: itineraryCard.title,
+        destination: itineraryCard.destination,
+        days: itineraryCard.days?.length,
+        totalCost: itineraryCard.estimatedCost?.total
+      })
+      
       return itineraryCard
 
     } catch (error: any) {
       console.error('[AgentTools] extractPlanStructure error:', error)
+      console.error('[AgentTools] Error stack:', error.stack)
       return null
     }
   }
