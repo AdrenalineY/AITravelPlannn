@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { reactAgentService } from '@/services/reactAgent'
 import { aiService } from '@/services/aiService'
 import { mapService } from '@/services/mapService'
+import AgentConfig from '@/config/agent.config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // 解析请求体
     const body = await request.json()
-    const { sessionId, message, maxTurns = 10 } = body
+    const { sessionId, message, maxTurns = AgentConfig.MAX_TURNS } = body
 
     console.log('[Agent API] 收到请求:', { userId: user.id, sessionId, messageLength: message?.length })
 

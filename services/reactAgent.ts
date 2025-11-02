@@ -14,6 +14,7 @@ import {
 import { aiService } from './aiService'
 import { AgentTools } from './agentTools'
 import { createClient } from '@/lib/supabase/client'
+import AgentConfig from '@/config/agent.config'
 
 interface AgentContext {
   sessionId: string
@@ -37,47 +38,163 @@ export class ReactAgent {
 当你认为基于用户当前提供信息，你的旅行规划已经完整时，你输出 Answer
 用 Thought 分析当前信息。使用 Action 运行您可用的操作之一，然后返回 PAUSE。Observation 是运行 Action 后的结果。
 
+**重要规划策略**:
+1. **前三轮制定整体方案**: 在前3轮思考中,应完成整体规划框架:
+   - 确定住宿位置(考虑交通便利性和景点分布)
+   - 制定每日时段安排(上午/下午/晚上)
+   - 分配景点到各时段(考虑地理位置接近性)
+   - 预留适当的休息时段
+2. **后续轮次补充细节**: 在完成整体框架后,使用工具查询具体的餐饮和交通信息
+3. **高效执行**: 避免重复搜索,一次性获取所需信息
+
 ## 可用工具
-1. calculate_distance:
-   - 格式: calculate_distance: 起点, 终点, 交通方式
-   - 用途: 计算两地距离、时间和交通费用
-   - 示例: calculate_distance: 东京站, 浅草寺, driving
 
-2. search_nearby:
-   - 格式: search_nearby: 地点, 类别, 半径
-   - 类别: attraction(景点)、restaurant(餐饮)、hotel(住宿)
-   - 用途: 搜索附近的POI信息
-   - 示例: search_nearby: 东京, attraction, 5000
+### 1. calculate_distance - 计算两地交通信息
+**格式**: Action: calculate_distance: 起点, 终点, 交通方式
+**参数**:
+  - 起点: 出发地点名称
+  - 终点: 目的地名称
+  - 交通方式: driving(驾车) | walking(步行) | transit(公交) | bicycling(骑行)
+**用途**: 获取两地之间的距离、耗时和预估交通费用
+**重要提示**: 
+  - 使用高德地图路径规划2.0 API
+  - 起终点尽量使用具体地点名称(如"故宫博物院"而非"故宫")
+  - 两点距离不宜过远(同城或相邻城市),否则可能超出API限制
+**示例**: 
+  - Action: calculate_distance: 天安门广场, 故宫博物院, walking
+  - Action: calculate_distance: 北京站, 颐和园, transit
 
-3. estimate_cost:
-   - 格式: estimate_cost: 项目类型, 详细信息(JSON格式)
-   - 用途: 估算各项费用
-   - 示例: estimate_cost: {"type":"住宿","location":"东京","nights":4,"level":"中等"}
+### 2. search_nearby - 搜索周边配套设施
+**格式**: Action: search_nearby: 城市+地点, 类别, 半径(可选)
+**参数**:
+  - 地点: **必须包含城市名称**的完整地点(如"上海豫园"、"北京故宫"、"成都宽窄巷子")
+  - 类别: restaurant(餐饮服务) | hotel(住宿服务) | shopping(购物场所) | entertainment(休闲娱乐)
+  - 半径: 搜索半径(米),默认5000,最大50000
+**返回信息**: 包含名称、地址、距离、评分、人均消费等
+**核心用途**: 为**已确定的景点**查找周边的餐饮和住宿配套服务
+**重要说明**: 
+  - 基于高德地图,主要支持**中国大陆地址**,国外地址数据有限
+  - **必须在地点前加城市名称**,避免搜索到其他城市的同名地点(如"豫园"会搜到香港,应使用"上海豫园")
+  - **不要**使用此工具搜索景点(attraction),景点应由你直接根据知识推荐
+  - 主要用于查找:**餐厅、酒店、购物场所、娱乐场所**
+**示例**: 
+  - Action: search_nearby: 北京故宫, restaurant, 1000  (✅正确:包含城市)
+  - Action: search_nearby: 上海豫园, restaurant, 1000  (✅正确:包含城市)
+  - Action: search_nearby: 故宫, restaurant, 1000  (❌错误:缺少城市,可能搜到其他城市)
+  - Action: search_nearby: 豫园, restaurant, 1000  (❌错误:会搜到香港的豫园)
+
+### 3. estimate_cost - 估算费用
+**格式**: Action: estimate_cost: {"type":"项目类型","详细字段..."}
+**参数**: JSON格式的详细信息
+**用途**: 估算住宿、餐饮、交通、门票等各项费用
+**示例**: 
+  - Action: estimate_cost: {"type":"住宿","location":"北京","nights":3,"level":"中等"}
+  - Action: estimate_cost: {"type":"餐饮","location":"成都","days":3,"people":2,"level":"普通"}
 
 ## Thought 原则
-1. 分析对话历史和当前需求
-2. 识别缺失的关键信息
-3. 考虑用户偏好和约束条件
-4. 规划合理的行程逻辑
+1. **需求分析**: 理解用户的旅行目的、偏好、预算、时间等核心需求
+2. **住宿优先**: 单城市旅游时,根据交通便利性和景点分布,先确定住宿区域
+3. **时段规划**: 将每日分为上午、下午、晚上三个时段,合理分配景点
+4. **景点选择**: 根据目的地特色和用户兴趣,**直接推荐**合适的旅游景点(利用你的知识库)
+5. **地理邻近**: 同一天的景点应地理位置接近,减少交通时间
+6. **适当留白**: 合理空出上午或晚上的时段,避免行程过于紧凑
+7. **配套查询**: 使用 search_nearby 为景点查找周边的餐饮(**记得加城市前缀**)
+8. **预算约束**: 在用户预算范围内提供合理建议
 
 ## Action 策略
-- 当需要两处地点之间的交通行程信息时 - 使用calculate_distance
-- 当需要一处地点附近的景点、餐饮、住宿信息时 - 使用search_nearby
-- 当需要费用信息时 - 使用estimate_cost  
+- **景点选择**: **不使用**工具,直接根据你的知识库推荐知名景点
+- **住宿优先**: 对于单城市旅游,先确定住宿位置,再安排景点
+- **获取交通信息**: 当需要知道两个景点之间的距离、时间、交通方式时 → 使用 calculate_distance
+- **查找餐饮住宿**: 确定景点后,使用 search_nearby 查找周边的餐厅和酒店(**必须加城市前缀**)
+- **预算估算**: 当需要了解住宿、餐饮等费用时 → 使用 estimate_cost
+- **合理使用半径**: 市区内用1000-2000米,郊区可用3000-5000米
+
+## 工作流程建议(单城市旅游)
+**第1-3轮(规划框架)**:
+1. **确定住宿区域**: 分析景点分布和交通,选择中心位置作为住宿区域
+2. **制定时段框架**: 列出每天的时段安排表(如: 第1天上午/下午/晚上,第2天上午/下午/晚上...)
+3. **分配景点**: 将知识库中的景点分配到各时段,同一天的景点地理位置接近
+4. **预留休息**: 适当空出上午或晚上时段,或安排购物、自由活动
+
+**第4-8轮(补充细节)**:
+5. **查找住宿**: 使用 search_nearby: 城市+住宿区域, hotel
+6. **查找餐饮**: 为需要用餐的时段,使用 search_nearby: 城市+景点, restaurant, 1000
+7. **计算交通**: 使用 calculate_distance 计算关键景点间的距离和时间
+8. **估算费用**: 使用 estimate_cost 估算住宿、餐饮、交通等费用
+
+**第9-10轮(完成规划)**:
+9. 整合所有信息,完善行程细节
+10. 输出完整的 Answer
 
 ## 输出要求
-最终Answer必须包含:
-1. 完整的旅行计划(自然语言)
-2. 明确的下一步问题引导用户提供更多细节
+最终 Answer 必须包含:
+1. **行程概览**: 天数、目的地、预算范围、住宿建议
+2. **每日计划**(按时段细分): 
+   - **上午**: 景点名称(如有) 或 休息/自由活动
+   - **午餐**: 推荐餐厅(使用search_nearby查找,含评分和人均消费)
+   - **下午**: 景点名称及附近餐饮推荐
+   - **晚餐**: 推荐餐厅
+   - **晚上**: 景点名称(如有) 或 休息/自由活动
+   - **交通**: 景点间的距离和时间(使用calculate_distance计算)
+3. **住宿安排**: 酒店位置、推荐(使用search_nearby查找)、价格区间
+4. **费用预估**: 住宿、餐饮、交通、门票等分项费用
+5. **实用建议**: 最佳游览时间、注意事项等
+6. **后续问题**: 引导用户提供更多细节以完善行程
 
-格式示例:
+**格式示例**:
 Answer:
-[详细的旅行计划内容...]
+根据您的需求,我为您规划了一份北京3日游行程:
 
-为了完善您的行程，请告诉我：
-1. 您的具体旅行日期是什么时候？
-2. 有几位同行人员？
-3. ...
+**行程概览**
+- 时间: 3天2晚
+- 目的地: 北京
+- 预算: 约2500元/人
+- 住宿区域: 王府井地区(交通便利,临近多个景点)
+
+**第1天: 天安门广场-故宫博物院**
+- 上午: 天安门广场游览
+- 午餐: 故宫周边 - 老北京炸酱面(评分4.6,人均60元,步行5分钟)
+- 下午: 故宫博物院(从天安门步行10分钟)
+- 晚餐: 王府井美食街 - 东来顺涮羊肉(评分4.5,人均80元)
+- 晚上: 休息或王府井夜景漫步
+- 交通: 天安门到故宫步行800米约10分钟
+
+**第2天: 八达岭长城**
+- 上午: 八达岭长城游览(巴士往返约4小时)
+- 午餐: 长城景区餐厅(人均50元)
+- 下午: 返回市区,适当休息
+- 晚餐: 酒店附近 - 便宜坊烤鸭(评分4.6,人均120元)
+- 晚上: 自由活动或早休息
+- 交通: 酒店到德胜门约8km,地铁30分钟;德胜门到长城巴士70km约2小时
+
+**第3天: 颐和园-返程**
+- 上午: 颐和园游览
+- 午餐: 颐和园周边 - 花家怡园(评分4.5,人均60元)
+- 下午: 自由活动或返程准备
+- 交通: 酒店到颐和园约15km,地铁40分钟
+
+**住宿安排**
+- 区域: 王府井地区
+- 推荐酒店: 如家快捷酒店/汉庭酒店(评分4.3-4.5)
+- 价格: 人均280元/晚
+- 优势: 靠近地铁,前往各景点方便
+
+**费用预估**
+- 住宿: 560元(280元/晚 × 2晚)
+- 餐饮: 600元(约60元/餐 × 10餐)
+- 交通: 400元(市内交通+长城往返)
+- 门票: 300元(故宫60+长城40+颐和园30+其他)
+- 总计: 约1860元
+
+**实用建议**
+- 最佳季节: 春秋季节(4-5月,9-10月)
+- 注意事项: 故宫需提前预约;长城建议早起避开人流
+- 美食推荐: 烤鸭、涮羊肉、炸酱面是必尝美食
+
+为了进一步完善您的行程,请告诉我:
+1. 您更偏好哪种类型的住宿(商务酒店/连锁酒店/青旅)?
+2. 对北京美食有特别的偏好吗(烤鸭/涮羊肉/小吃等)?
+3. 需要调整行程节奏吗(更紧凑/更悠闲)?
 `.trim()
 
   constructor(context: AgentContext, supabaseClient?: any) {
@@ -93,7 +210,7 @@ Answer:
    * 运行完整的 ReAct 循环
    * 对应 Python 版本的 __call__ 方法
    */
-  async run(userMessage: string, maxTurns: number = 10): Promise<{
+  async run(userMessage: string, maxTurns: number = AgentConfig.MAX_TURNS): Promise<{
     success: boolean
     finalAnswer?: string
     planExtracted?: ItineraryCard
@@ -137,11 +254,32 @@ Answer:
       // 主循环 - Thought → Action → Observation → Answer
       for (let turn = 0; turn < maxTurns; turn++) {
         this.turnCount = turn + 1
-        console.log(`[ReactAgent] Turn ${this.turnCount}`)
+        console.log(`[ReactAgent] Turn ${this.turnCount}/${maxTurns}`)
+
+        // 如果是最后一轮,添加强制输出提示
+        let turnPrompt = ''
+        if (turn + 1 === maxTurns) {
+          turnPrompt = `\n\n[重要提示] 这是第 ${maxTurns} 轮(最后一轮),你**必须**在本轮输出 Answer,不能再执行 Action。请基于已有信息,输出完整的旅行规划。`
+        } else if (turn + 1 >= AgentConfig.WARNING_TURN) {
+          turnPrompt = `\n\n[提示] 这是第 ${turn + 1} 轮,还剩 ${maxTurns - turn - 1} 轮。请加快规划进度,尽快完成并输出 Answer。`
+        }
+
+        // 如果有轮次提示,临时添加到消息中
+        if (turnPrompt) {
+          this.messages.push({
+            role: 'user',
+            content: turnPrompt
+          })
+        }
 
         // 调用 LLM
         const result = await this.executeLLM()
         console.log(`[ReactAgent] LLM Response:\n${result}`)
+
+        // 移除轮次提示消息
+        if (turnPrompt) {
+          this.messages.pop()
+        }
 
         // 记录消息(后续会根据类型分类)
         await this.saveMessage('thought', result, turn + 1)
@@ -149,8 +287,8 @@ Answer:
         // 解析 Action
         const action = this.parseAction(result)
 
-        if (action) {
-          // 有 Action - 执行工具调用
+        if (action && turn + 1 < maxTurns) {
+          // 有 Action 且不是最后一轮 - 执行工具调用
           console.log(`[ReactAgent] Action: ${action.action}`)
           console.log(`[ReactAgent] Input: ${action.actionInput}`)
 
@@ -179,6 +317,39 @@ Answer:
             role: 'user',
             content: `Observation: ${toolResult.observation}`
           })
+        } else if (action && turn + 1 === maxTurns) {
+          // 最后一轮但仍然有 Action - 强制提取 Answer
+          console.log(`[ReactAgent] 最后一轮检测到 Action,强制提取 Answer`)
+          const finalAnswer = this.extractFinalAnswer(result) || '抱歉,未能在规定轮次内完成完整规划。请提供更多信息或简化需求。'
+          
+          await this.saveMessage('answer', finalAnswer, turn + 1)
+
+          const planExtracted = await this.extractPlanStructure(finalAnswer)
+
+          await this.supabase
+            .from('agent_runs')
+            .update({
+              final_answer: finalAnswer,
+              plan_extracted: planExtracted,
+              status: 'completed',
+              turn_count: turn + 1,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', this.agentRunId)
+
+          const { data: messages } = await this.supabase
+            .from('agent_messages')
+            .select('*')
+            .eq('agent_run_id', this.agentRunId)
+            .order('turn_number', { ascending: true })
+
+          return {
+            success: true,
+            finalAnswer,
+            planExtracted: planExtracted || undefined,
+            agentRunId: this.agentRunId!,
+            messages: messages || []
+          }
         } else {
           // 没有 Action - 输出最终答案
           const finalAnswer = this.extractFinalAnswer(result)
@@ -271,6 +442,13 @@ Answer:
       ? JSON.stringify(this.context.currentPlan, null, 2)
       : '暂无计划'
 
+    // 尝试从用户消息中提取目标城市
+    const targetCity = this.extractTargetCity(currentMessage)
+    if (targetCity) {
+      console.log(`[ReactAgent] 检测到目标城市: ${targetCity}`)
+      AgentTools.setTargetCity(targetCity)
+    }
+
     return `
 当前用户输入: ${currentMessage}
 
@@ -283,6 +461,28 @@ ${preferencesFormatted}
 当前旅行计划状态:
 ${planFormatted}
 `.trim()
+  }
+
+  /**
+   * 从用户消息中提取目标城市
+   */
+  private extractTargetCity(message: string): string | null {
+    const chineseCities = [
+      '北京', '上海', '天津', '重庆',
+      '广州', '深圳', '杭州', '南京', '苏州', '成都', '武汉', '西安',
+      '长沙', '沈阳', '青岛', '郑州', '大连', '宁波', '厦门', '济南',
+      '哈尔滨', '长春', '福州', '石家庄', '南昌', '贵阳', '南宁', '昆明',
+      '兰州', '太原', '合肥', '乌鲁木齐', '海口', '呼和浩特', '拉萨', '银川',
+      '西宁', '无锡', '佛山', '温州', '常州', '珠海', '东莞', '中山'
+    ]
+    
+    for (const city of chineseCities) {
+      if (message.includes(city)) {
+        return city
+      }
+    }
+    
+    return null
   }
 
   /**

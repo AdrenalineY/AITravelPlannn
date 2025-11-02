@@ -28,6 +28,9 @@ import { agentServiceClient } from '@/services/agentServiceClient'
 import type { TravelRequirements, ChatMessage } from '@/types'
 
 const { Header, Sider, Content } = Layout
+
+// Agent 配置
+const AGENT_MAX_TURNS = parseInt(process.env.NEXT_PUBLIC_AGENT_MAX_TURNS || '10', 10)
 const { RangePicker } = DatePicker
 
 export default function DashboardPage() {
@@ -168,7 +171,7 @@ export default function DashboardPage() {
       const result = await agentServiceClient.runAgent({
         message: content,
         sessionId: currentSession?.id,
-        maxTurns: 10,
+        maxTurns: AGENT_MAX_TURNS,
       })
 
       console.log('[Dashboard] Agent 运行完成:', result)

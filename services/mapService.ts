@@ -20,15 +20,30 @@ interface AmapRouteResponse {
   status: string
   info: string
   route: {
-    paths: Array<{
+    // 驾车、步行、骑行路线
+    paths?: Array<{
       distance: string
-      duration: string
+      duration?: string
+      cost?: {
+        duration?: string  // v5 API中的耗时
+        tolls?: string
+      }
       steps: Array<{
         instruction: string
         distance: string
-        duration: string
+        duration?: string
+        step_duration?: string
         polyline: string
       }>
+    }>
+    // 公交路线
+    transits?: Array<{
+      distance: string
+      duration?: string
+      cost?: {
+        duration?: string
+        transit_fee?: string
+      }
     }>
   }
 }
@@ -53,7 +68,7 @@ class MapService {
   }
 
   /**
-   * POI 搜索
+   * POI 搜索(关键字搜索)
    */
   async searchPOI(query: string, location?: Location, city?: string): Promise<POI[]> {
     if (!this.webServiceKey) {
@@ -101,6 +116,94 @@ class MapService {
   }
 
   /**
+   * 周边POI搜索(使用高德POI搜索2.0接口)
+   * @param options 搜索选项
+   * @returns POI列表(包含距离、评分、人均消费等信息)
+   */
+  async searchNearbyPOI(options: {
+    location: Location
+    types?: string  // POI分类编码,用|分隔
+    keywords?: string  // 关键字(可选)
+    radius?: number  // 搜索半径(米),默认5000,最大50000
+    pageSize?: number  // 返回数量,默认10,最大25
+    sortrule?: 'distance' | 'weight'  // 排序规则:distance按距离,weight综合排序
+    showFields?: string  // 额外返回字段,如: children,business,navi,indoor,photos
+  }): Promise<Array<POI & { distance?: string; cost?: string; tel?: string; businessArea?: string; typecode?: string }>> {
+    if (!this.webServiceKey) {
+      throw new Error('高德地图 Web服务 API Key 未配置')
+    }
+
+    const {
+      location,
+      types,
+      keywords,
+      radius = 5000,
+      pageSize = 10,
+      sortrule = 'distance',
+      showFields = 'business'  // 默认返回商业信息(评分、人均消费等)
+    } = options
+
+    try {
+      // 使用POI搜索2.0周边搜索接口
+      const params = new URLSearchParams({
+        key: this.webServiceKey,
+        location: `${location.lng},${location.lat}`,
+        radius: Math.min(radius, 50000).toString(),  // 限制最大50000米
+        page_size: Math.min(pageSize, 25).toString(),  // 限制最大25条
+        sortrule,
+        show_fields: showFields,
+      })
+
+      // 添加可选参数
+      if (types) {
+        params.append('types', types)
+      }
+      if (keywords) {
+        params.append('keywords', keywords)
+      }
+
+      // POI搜索2.0使用新的baseUrl
+      const apiUrl = 'https://restapi.amap.com/v5/place/around'
+      console.log(`[MapService] 周边搜索: ${apiUrl}?${params}`)
+
+      const response = await fetch(`${apiUrl}?${params}`)
+      const data: any = await response.json()
+
+      console.log(`[MapService] 周边搜索响应:`, { status: data.status, info: data.info, count: data.count })
+
+      if (data.status !== '1') {
+        throw new Error(data.info || '周边POI搜索失败')
+      }
+
+      if (!data.pois || data.pois.length === 0) {
+        return []
+      }
+
+      return data.pois.map((poi: any) => {
+        const [lng, lat] = poi.location.split(',').map(Number)
+        return {
+          id: poi.id,
+          name: poi.name,
+          type: poi.type,
+          typecode: poi.typecode,
+          category: poi.type,
+          location: { lat, lng },
+          address: poi.address || '',
+          distance: poi.distance,  // 距离(米)
+          rating: poi.rating,  // 评分
+          cost: poi.cost,  // 人均消费
+          tel: poi.tel,  // 电话
+          businessArea: poi.business_area,  // 商圈
+          photos: poi.photos?.map((p: any) => p.url),
+        }
+      })
+    } catch (error: any) {
+      console.error('[MapService] 周边POI搜索错误:', error)
+      throw error
+    }
+  }
+
+  /**
    * 获取 POI 详情
    */
   async getPOIDetail(id: string): Promise<POI | null> {
@@ -142,7 +245,8 @@ class MapService {
   }
 
   /**
-   * 路线规划
+   * 路线规划 - 使用高德路径规划2.0 API
+   * 支持驾车、步行、骑行、公交多种交通方式
    */
   async planRoute(
     origin: Location,
@@ -154,6 +258,7 @@ class MapService {
     }
 
     try {
+      // 路径规划2.0使用v5版本API
       const modeMap = {
         driving: 'driving',
         walking: 'walking',
@@ -165,30 +270,63 @@ class MapService {
         key: this.webServiceKey,
         origin: `${origin.lng},${origin.lat}`,
         destination: `${destination.lng},${destination.lat}`,
+        show_fields: 'cost',  // 显示耗时和费用信息
       })
 
+      // 公交路线需要额外的城市参数
+      if (mode === 'transit') {
+        // 简化处理:使用全国通用代码,实际应该根据坐标获取城市代码
+        params.append('city1', '010')  // 北京citycode
+        params.append('city2', '010')
+      }
+
       const apiMode = modeMap[mode]
-      const response = await fetch(`${this.baseUrl}/direction/${apiMode}?${params}`)
+      // 使用v5版本的路径规划API
+      const apiUrl = `https://restapi.amap.com/v5/direction/${apiMode}`
+      console.log(`[MapService] 路径规划: ${apiUrl}?${params}`)
+
+      const response = await fetch(`${apiUrl}?${params}`)
       const data: AmapRouteResponse = await response.json()
 
-      if (data.status !== '1' || !data.route?.paths?.[0]) {
+      console.log(`[MapService] 路径规划响应:`, { status: data.status, info: data.info })
+
+      if (data.status !== '1') {
         throw new Error(data.info || '路线规划失败')
       }
 
-      const path = data.route.paths[0]
+      // 公交路线返回结构不同
+      if (mode === 'transit') {
+        const transit = data.route?.transits?.[0]
+        if (!transit) {
+          throw new Error('未找到公交路线')
+        }
+        return {
+          distance: parseFloat(transit.distance || '0'),
+          duration: parseFloat(transit.cost?.duration || transit.duration || '0'),
+          polyline: '',
+          steps: [],
+        }
+      }
+
+      // 驾车、步行、骑行路线
+      const path = data.route?.paths?.[0]
+      if (!path) {
+        throw new Error('未找到路线')
+      }
+
       return {
         distance: parseFloat(path.distance),
-        duration: parseFloat(path.duration),
-        polyline: path.steps.map(s => s.polyline).join(';'),
-        steps: path.steps.map((step) => ({
+        duration: parseFloat(path.cost?.duration || path.duration || '0'),
+        polyline: path.steps?.map((s: any) => s.polyline).join(';') || '',
+        steps: path.steps?.map((step: any) => ({
           instruction: step.instruction,
           distance: parseFloat(step.distance),
-          duration: parseFloat(step.duration),
-        })),
+          duration: parseFloat(step.step_duration || step.duration || '0'),
+        })) || [],
       }
-    } catch (error) {
-      console.error('路线规划错误:', error)
-      return null
+    } catch (error: any) {
+      console.error('[MapService] 路线规划错误:', error)
+      throw error
     }
   }
 
