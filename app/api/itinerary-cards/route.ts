@@ -26,10 +26,6 @@ export async function GET(request: NextRequest) {
         .from('itinerary_days')
         .select('*')
         .eq('itinerary_id', testId)
-      
-      console.log('[API GET DEBUG] Checking days for itinerary:', testId)
-      console.log('[API GET DEBUG] Days data:', daysData)
-      console.log('[API GET DEBUG] Days error:', daysError)
     }
 
     // 从数据库加载行程卡片 (使用 itineraries 表,包含关联的 days 和 activities)
@@ -48,13 +44,6 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[API] Load itinerary cards error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    // 🔍 调试: 检查原始数据
-    console.log('[API GET] Loaded itineraries count:', data.length)
-    if (data.length > 0) {
-      console.log('[API GET] First itinerary days:', data[0].days)
-      console.log('[API GET] First itinerary raw data:', JSON.stringify(data[0], null, 2))
     }
 
     // 转换数据库字段为前端格式 (snake_case -> camelCase)
@@ -168,8 +157,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    
-    console.log('[API] Creating itinerary with data:', JSON.stringify(body, null, 2))
 
     // 转换为数据库格式 (camelCase -> snake_case)
     // 注意: 
@@ -224,14 +211,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 插入天数和活动数据
-    console.log('[API POST] Checking body.days:', body.days ? `Array with ${body.days.length} items` : 'undefined or null')
-    
     if (body.days && Array.isArray(body.days) && body.days.length > 0) {
-      console.log('[API POST] Starting to insert days and segments...')
-      
       for (let dayIndex = 0; dayIndex < body.days.length; dayIndex++) {
         const day = body.days[dayIndex]
-        console.log(`[API POST] Processing day ${dayIndex + 1}:`, day.title || `第${dayIndex + 1}天`)
         
         // 🔧 修复: 计算日期 - 如果没有提供date,基于startDate和dayNumber计算
         let dayDate = day.date
@@ -260,8 +242,6 @@ export async function POST(request: NextRequest) {
           total_cost: day.segments?.reduce((sum: number, seg: any) => sum + (seg.costEstimate || 0), 0) || 0,
         }
         
-        console.log(`[API POST] Inserting day ${dayIndex + 1} data:`, JSON.stringify(dayInsertData, null, 2))
-        
         const { data: dayRecord, error: dayError } = await supabase
           .from('itinerary_days')
           .insert(dayInsertData)
@@ -269,16 +249,11 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (dayError) {
-          console.error('[API POST] ❌ Save day error:', dayError)
-          console.error('[API POST] Day data that failed:', { dayIndex, dayDate, title: day.title })
+          console.error('[API POST] Save day error:', dayError)
           continue
         }
-        
-        console.log(`[API POST] ✅ Day ${dayIndex + 1} saved successfully, ID:`, dayRecord.id)
 
         // 插入活动数据
-        console.log(`[API POST] Day ${dayIndex + 1} has ${day.segments?.length || 0} segments`)
-        
         if (day.segments && Array.isArray(day.segments) && day.segments.length > 0) {
           const activities = day.segments.map((segment: any) => {
             // 🔧 修复: 合并餐饮详情到 distance_info
@@ -327,9 +302,6 @@ export async function POST(request: NextRequest) {
               transport_details: segment.transportDetails || segment.transport_details || {},
             }
           })
-
-          console.log(`[API POST] Inserting ${activities.length} activities for day ${dayIndex + 1}`)
-          console.log('[API POST] First activity:', JSON.stringify(activities[0], null, 2))
           
           const { data: activitiesData, error: activitiesError } = await supabase
             .from('itinerary_activities')
@@ -337,20 +309,11 @@ export async function POST(request: NextRequest) {
             .select()
 
           if (activitiesError) {
-            console.error('[API POST] ❌ Save activities error:', activitiesError)
-            console.error('[API POST] Failed activities data:', activities)
-          } else {
-            console.log(`[API POST] ✅ Saved ${activitiesData?.length || 0} activities for day ${dayIndex + 1}`)
+            console.error('[API POST] Save activities error:', activitiesError)
           }
         }
       }
-      
-      console.log('[API POST] ✅ Finished inserting all days and segments')
-    } else {
-      console.log('[API POST] ⚠️ No days data to insert')
     }
-
-    console.log('[API] Itinerary created successfully:', itinerary.id)
     
     // 🔧 查询完整数据(包括 days 和 activities)返回给前端
     const { data: fullItinerary, error: queryError } = await supabase

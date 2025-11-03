@@ -119,7 +119,12 @@ export function ItineraryDetailModal({
           <Descriptions.Item label="行程时长">
             <Space>
               <ClockCircleOutlined />
-              {itinerary.totalDays}天{itinerary.totalNights}晚
+              {(() => {
+                // 优先使用 durationDays/durationNights
+                const days = itinerary.durationDays || itinerary.totalDays || itinerary.days?.length || 0
+                const nights = itinerary.durationNights ?? itinerary.totalNights ?? Math.max(0, days - 1)
+                return `${days}天${nights}晚`
+              })()}
             </Space>
           </Descriptions.Item>
           
@@ -172,16 +177,34 @@ export function ItineraryDetailModal({
                 </div>
               </Col>
             )}
-            {(itinerary.budgetPerPerson || itinerary.estimatedCost?.perPerson) && (
-              <Col span={8}>
-                <div className="text-center">
-                  <Text type="secondary">人均费用</Text>
-                  <div className="text-2xl font-bold text-orange-600 mt-2">
-                    ¥{itinerary.budgetPerPerson || itinerary.estimatedCost?.perPerson}
+            {(() => {
+              // 计算人均费用: 优先使用预估费用/人数,其次使用budgetPerPerson
+              const travelers = itinerary.travelers || 1
+              let perPersonCost = 0
+              
+              if (itinerary.estimatedCost?.total && travelers > 0) {
+                // 优先使用预估费用除以人数
+                perPersonCost = Math.round(itinerary.estimatedCost.total / travelers)
+              } else if (itinerary.estimatedCost?.perPerson) {
+                perPersonCost = itinerary.estimatedCost.perPerson
+              } else if (itinerary.budgetPerPerson) {
+                perPersonCost = itinerary.budgetPerPerson
+              } else if (itinerary.totalBudget && travelers > 0) {
+                // 使用总预算除以人数
+                perPersonCost = Math.round(itinerary.totalBudget / travelers)
+              }
+              
+              return perPersonCost > 0 ? (
+                <Col span={8}>
+                  <div className="text-center">
+                    <Text type="secondary">人均费用</Text>
+                    <div className="text-2xl font-bold text-orange-600 mt-2">
+                      ¥{perPersonCost}
+                    </div>
                   </div>
-                </div>
-              </Col>
-            )}
+                </Col>
+              ) : null
+            })()}
           </Row>
 
           {itinerary.estimatedCost?.breakdown && itinerary.estimatedCost.breakdown.length > 0 && (

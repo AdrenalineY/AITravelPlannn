@@ -28,7 +28,46 @@ export class AgentTools {
   }
 
   /**
+   * 使用关键字搜索找到最相关的POI
+   * @param query 查询关键词(地点名称)
+   * @param city 城市名称(可选)
+   * @returns POI信息,包含精确的坐标和名称
+   */
+  static async findBestMatchPOI(query: string, city?: string): Promise<{ name: string; location: { lng: number; lat: number } } | null> {
+    try {
+      console.log(`[AgentTools] 搜索POI: ${query}${city ? ` (城市: ${city})` : ''}`)
+      
+      // 如果查询词中已包含城市名,尝试提取
+      let searchCity = city
+      if (!searchCity && this.targetCity) {
+        searchCity = this.targetCity
+      }
+      
+      // 使用POI搜索API
+      const pois = await mapService.searchPOI(query, undefined, searchCity)
+      
+      if (!pois || pois.length === 0) {
+        console.warn(`[AgentTools] 未找到匹配的POI: ${query}`)
+        return null
+      }
+      
+      // 返回第一个(最相关的)结果
+      const bestMatch = pois[0]
+      console.log(`[AgentTools] 找到最佳匹配: ${bestMatch.name} (${bestMatch.location.lng}, ${bestMatch.location.lat})`)
+      
+      return {
+        name: bestMatch.name,
+        location: bestMatch.location
+      }
+    } catch (error: any) {
+      console.error(`[AgentTools] POI搜索失败: ${query}`, error)
+      return null
+    }
+  }
+
+  /**
    * 计算两地距离和交通信息
+   * 使用关键字搜索 + 路径规划的组合方式
    * 对应 Python 版本的 calculate_distance
    */
   static async calculateDistance(
@@ -40,23 +79,26 @@ export class AgentTools {
     try {
       console.log(`[AgentTools] calculateDistance: ${origin} -> ${destination} (${mode})`)
 
-      // 先将地址转换为坐标
-      const originLoc = await mapService.geocode(origin)
-      const destLoc = await mapService.geocode(destination)
+      // 🔧 改进: 先使用关键字搜索找到最相关的POI
+      const originPOI = await this.findBestMatchPOI(origin, this.targetCity || undefined)
+      const destPOI = await this.findBestMatchPOI(destination, this.targetCity || undefined)
 
-      if (!originLoc || !destLoc) {
+      if (!originPOI || !destPOI) {
+        const failedPlace = !originPOI ? origin : destination
         return {
-          observation: `无法解析地址: ${!originLoc ? origin : destination}`,
-          error: 'Geocoding failed'
+          observation: `无法找到地点: ${failedPlace}。建议使用更具体的地点名称,如"故宫博物院"而非"故宫"`,
+          error: 'POI search failed'
         }
       }
+      
+      console.log(`[AgentTools] 起点: ${originPOI.name} -> 终点: ${destPOI.name}`)
 
       // 调用高德地图服务获取路线信息
-      const routeInfo = await mapService.planRoute(originLoc, destLoc, mode)
+      const routeInfo = await mapService.planRoute(originPOI.location, destPOI.location, mode)
 
       if (!routeInfo) {
         return {
-          observation: `无法获取从 ${origin} 到 ${destination} 的路线信息`,
+          observation: `无法获取从 ${originPOI.name} 到 ${destPOI.name} 的路线信息`,
           error: 'No route found'
         }
       }
@@ -86,7 +128,8 @@ export class AgentTools {
       }
 
       // 构建详细的observation,包含交通方式的详细信息
-      let observation = `从 ${origin} 到 ${destination}`
+      // 使用实际找到的POI名称,更精确
+      let observation = `从 ${originPOI.name} 到 ${destPOI.name}`
       
       if (mode === 'transit' && routeInfo.transitDetails) {
         // 公交/地铁模式:显示详细的换乘方案
@@ -427,8 +470,8 @@ ${naturalLanguagePlan}
   "cities": ["涉及的城市1", "城市2"],
   "startDate": "YYYY-MM-DD",
   "endDate": "YYYY-MM-DD",
-  "totalDays": 天数(整数),
-  "totalNights": 晚数(整数),
+  "durationDays": 行程天数(整数,如"3天2晚"中的3),
+  "durationNights": 行程晚数(整数,如"3天2晚"中的2),
   
   "travelers": 总人数,
   "travelersDetail": {
@@ -569,8 +612,9 @@ ${naturalLanguagePlan}
 5. **缺失信息**: 使用null,并添加到pendingQuestions数组
 6. **数组**: 即使只有一个元素也要使用数组格式
 7. **segments的order**: 从1开始递增
-8. **计算字段**: totalDays, totalNights, perPerson, percentage 等需要计算
-9. **提取原则**: 尽可能完整提取,但不要编造不存在的信息
+8. **行程天数**: durationDays和durationNights是核心字段,必须准确提取(如"3天2晚"中的3和2)
+9. **计算字段**: perPerson, percentage 等需要计算
+10. **提取原则**: 尽可能完整提取,但不要编造不存在的信息
 
 【输出格式】
 直接输出JSON,不要markdown代码块标记,不要任何解释文字。`
@@ -598,17 +642,24 @@ ${naturalLanguagePlan}
 
       const planData = JSON.parse(jsonMatch[0])
       
-      // 计算总天数和晚数(如果未提供)
-      let totalDays = planData.totalDays
-      let totalNights = planData.totalNights
+      // 计算行程天数和晚数(优先使用durationDays/durationNights)
+      let durationDays = planData.durationDays
+      let durationNights = planData.durationNights
       
-      if (!totalDays && planData.startDate && planData.endDate) {
-        const start = new Date(planData.startDate)
-        const end = new Date(planData.endDate)
-        totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-        totalNights = totalDays - 1
-      } else if (!totalNights && totalDays) {
-        totalNights = Math.max(0, totalDays - 1)
+      // 如果未提供durationDays,尝试从其他来源计算
+      if (!durationDays) {
+        if (planData.startDate && planData.endDate) {
+          const start = new Date(planData.startDate)
+          const end = new Date(planData.endDate)
+          durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        } else if (planData.days && planData.days.length > 0) {
+          durationDays = planData.days.length
+        }
+      }
+      
+      // 如果未提供durationNights,从durationDays计算
+      if (!durationNights && durationDays) {
+        durationNights = Math.max(0, durationDays - 1)
       }
       
       // 计算人均费用(如果未提供)
@@ -652,8 +703,10 @@ ${naturalLanguagePlan}
         sessionId: context.sessionId,
         userId: context.userId,
         ...planData,
-        totalDays: totalDays || planData.days?.length || 1,
-        totalNights,
+        durationDays: durationDays || planData.days?.length || 1,
+        durationNights: durationNights ?? 0,
+        totalDays: durationDays || planData.days?.length || 1,  // 兼容旧字段
+        totalNights: durationNights ?? 0,  // 兼容旧字段
         budgetPerPerson,
         currency: planData.currency || 'CNY',
         rawPlan: naturalLanguagePlan.substring(0, 500),

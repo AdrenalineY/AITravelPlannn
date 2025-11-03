@@ -145,12 +145,28 @@ export function ItineraryCard({
                 <TeamOutlined className="mr-1" />
                 {itinerary.travelers || 1}人
               </span>
-              {(itinerary.budgetPerPerson || itinerary.totalBudget) && (
-                <span>
-                  <DollarOutlined className="mr-1" />
-                  ¥{itinerary.budgetPerPerson || itinerary.totalBudget}/人
-                </span>
-              )}
+              {(() => {
+                // 计算人均费用: 确保逻辑一致
+                const travelers = itinerary.travelers || 1
+                let perPersonCost = 0
+                
+                if (itinerary.estimatedCost?.total && travelers > 0) {
+                  perPersonCost = Math.round(itinerary.estimatedCost.total / travelers)
+                } else if (itinerary.estimatedCost?.perPerson) {
+                  perPersonCost = itinerary.estimatedCost.perPerson
+                } else if (itinerary.budgetPerPerson) {
+                  perPersonCost = itinerary.budgetPerPerson
+                } else if (itinerary.totalBudget && travelers > 0) {
+                  perPersonCost = Math.round(itinerary.totalBudget / travelers)
+                }
+                
+                return perPersonCost > 0 ? (
+                  <span>
+                    <DollarOutlined className="mr-1" />
+                    ¥{perPersonCost}/人
+                  </span>
+                ) : null
+              })()}
             </Space>
           </div>
 
@@ -280,16 +296,32 @@ export function ItineraryCard({
               </Space>
             </Tooltip>
 
-            {(itinerary.budgetPerPerson || itinerary.totalBudget) && (
-              <Tooltip title="人均预算">
-                <Space>
-                  <DollarOutlined className="text-gray-500" />
-                  <Text strong className="text-green-600">
-                    ¥{itinerary.budgetPerPerson || itinerary.totalBudget}
-                  </Text>
-                </Space>
-              </Tooltip>
-            )}
+            {(() => {
+              // 计算人均费用: 确保逻辑一致
+              const travelers = itinerary.travelers || 1
+              let perPersonCost = 0
+              
+              if (itinerary.estimatedCost?.total && travelers > 0) {
+                perPersonCost = Math.round(itinerary.estimatedCost.total / travelers)
+              } else if (itinerary.estimatedCost?.perPerson) {
+                perPersonCost = itinerary.estimatedCost.perPerson
+              } else if (itinerary.budgetPerPerson) {
+                perPersonCost = itinerary.budgetPerPerson
+              } else if (itinerary.totalBudget && travelers > 0) {
+                perPersonCost = Math.round(itinerary.totalBudget / travelers)
+              }
+              
+              return perPersonCost > 0 ? (
+                <Tooltip title="人均预算">
+                  <Space>
+                    <DollarOutlined className="text-gray-500" />
+                    <Text strong className="text-green-600">
+                      ¥{perPersonCost}
+                    </Text>
+                  </Space>
+                </Tooltip>
+              ) : null
+            })()}
           </Space>
 
           {/* 旅行风格和标签 */}

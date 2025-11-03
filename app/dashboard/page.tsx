@@ -106,11 +106,6 @@ export default function DashboardPage() {
         if (loadedConfig.map?.webServiceKey) {
           mapService.setWebServiceKey(loadedConfig.map.webServiceKey)
         }
-        
-        console.log('[Dashboard] 配置加载成功:', {
-          hasLLMKey: !!loadedConfig.llm?.apiKey,
-          hasMapKey: !!loadedConfig.map?.webServiceKey,
-        })
       } catch (error: any) {
         console.error('[Dashboard] 配置加载失败:', error)
         message.error('加载配置失败: ' + error.message)
@@ -168,15 +163,11 @@ export default function DashboardPage() {
     // 使用 Agent 模式
     setIsAgentRunning(true)
     try {
-      console.log('[Dashboard] 启动 Agent 模式...')
-      
       const result = await agentServiceClient.runAgent({
         message: content,
         sessionId: currentSession?.id,
         maxTurns: AGENT_MAX_TURNS,
       })
-
-      console.log('[Dashboard] Agent 运行完成:', result)
 
       if (result.success && result.finalAnswer) {
         // 保存会话 ID
@@ -210,9 +201,6 @@ export default function DashboardPage() {
           
           // 🔧 修复: 后端已经保存了行程数据,前端不需要重复保存
           // Agent API 在 /api/agent/run 中已经完整保存了 itinerary (包括 days 和 activities)
-          // 这里只需要显示提示,避免重复创建卡片
-          console.log('[Dashboard] 行程数据已由后端保存, itineraryId:', result.itineraryId)
-          
           if (result.itineraryId) {
             message.success('行程已自动保存!')
           }

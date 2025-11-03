@@ -27,16 +27,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { sessionId, message, maxTurns = AgentConfig.MAX_TURNS } = body
 
-    // 🔍 调试: 打印 Agent 配置
-    console.log('[Agent API] Agent Configuration:')
-    console.log('  - MAX_TURNS (config):', AgentConfig.MAX_TURNS)
-    console.log('  - WARNING_TURN (config):', AgentConfig.WARNING_TURN)
-    console.log('  - maxTurns (from request):', maxTurns)
-    console.log('  - ENV MAX_TURNS:', process.env.NEXT_PUBLIC_AGENT_MAX_TURNS)
-    console.log('  - ENV WARNING_TURN:', process.env.NEXT_PUBLIC_AGENT_WARNING_TURN)
-    
-    console.log('[Agent API] 收到请求:', { userId: user.id, sessionId, messageLength: message?.length })
-
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: '缺少消息内容' }, { status: 400 })
     }
@@ -53,7 +43,6 @@ export async function POST(request: NextRequest) {
 
       if (error || !data) {
         // 会话不存在，创建新会话（而不是报错）
-        console.log('[Agent API] 会话不存在或已过期，创建新会话...', error?.message)
         const { data: newSession, error: createError } = await supabase
           .from('conversation_sessions')
           .insert({
@@ -97,15 +86,12 @@ export async function POST(request: NextRequest) {
           }, { status: 500 })
         }
         
-        console.log('[Agent API] 新会话创建成功:', newSession.id)
         session = newSession
       } else {
-        console.log('[Agent API] 使用现有会话:', data.id)
         session = data
       }
     } else {
       // 创建新会话
-      console.log('[Agent API] 未提供 sessionId，创建新会话...')
       const { data, error } = await supabase
         .from('conversation_sessions')
         .insert({
@@ -149,29 +135,16 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
       
-      console.log('[Agent API] 新会话创建成功:', data.id)
       session = data
     }
 
     // 加载用户的 API 配置 (使用后端 Supabase 客户端)
-    console.log('[Agent API] 开始加载配置, userId:', user.id)
     const { ConfigService } = await import('@/services/configService')
     const backendConfigService = new ConfigService(supabase)
     const config = await backendConfigService.loadConfig(user.id)
     
-    console.log('[Agent API] 配置加载结果:', {
-      hasConfig: !!config,
-      hasLLM: !!config?.llm,
-      hasLLMKey: !!config?.llm?.apiKey,
-      llmKeyLength: config?.llm?.apiKey?.length || 0,
-      llmKeyPrefix: config?.llm?.apiKey?.substring(0, 10) || 'N/A',
-      hasMap: !!config?.map,
-      hasMapWebKey: !!config?.map?.webServiceKey,
-      mapWebKeyLength: config?.map?.webServiceKey?.length || 0,
-    })
-    
     if (!config) {
-      console.error('[Agent API] 未找到配置, userId:', user.id)
+      console.error('[Agent API] 未找到配置')
       return NextResponse.json(
         { 
           error: '请先配置 API 密钥',
@@ -206,8 +179,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
-    console.log('[Agent API] 配置验证通过，准备设置服务')
 
     // 配置服务
     if (config.llm) {
@@ -218,7 +189,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 创建并运行 Agent（传入后端 Supabase 客户端）
-    console.log('[Agent API] 创建 Agent, sessionId:', session.id, 'userId:', user.id)
     const agent = await reactAgentService.createAgent(session.id, user.id, supabase)
     const result = await agent.run(message, maxTurns)
 
@@ -236,8 +206,6 @@ export async function POST(request: NextRequest) {
     // 如果提取到了行程计划,保存完整数据到 itineraries 表
     let itineraryId = session.itinerary_id
     if (result.planExtracted && !session.itinerary_id) {
-      console.log('[Agent API] 保存完整行程计划...')
-      
       // 🔧 修复: 使用完整的 planExtracted 数据,包括 days
       const planData = {
         ...result.planExtracted,
@@ -280,13 +248,6 @@ export async function POST(request: NextRequest) {
         version: 1,
       }
       
-      console.log('[Agent API] API Payload:', {
-        title: apiPayload.title,
-        destination: apiPayload.destination,
-        daysCount: apiPayload.days?.length,
-        travelers: apiPayload.travelers,
-      })
-      
       // 调用 itinerary-cards API 来保存完整数据 (包括 days 和 activities)
       const { data: newItinerary, error: itineraryError } = await supabase
         .from('itineraries')
@@ -328,8 +289,6 @@ export async function POST(request: NextRequest) {
 
         // 保存 days 和 activities
         if (apiPayload.days && apiPayload.days.length > 0) {
-          console.log('[Agent API] 保存', apiPayload.days.length, '天行程数据...')
-          
           for (let dayIndex = 0; dayIndex < apiPayload.days.length; dayIndex++) {
             const day = apiPayload.days[dayIndex]
             
@@ -366,8 +325,6 @@ export async function POST(request: NextRequest) {
               console.error('[Agent API] 保存第', dayIndex + 1, '天失败:', dayError)
               continue
             }
-            
-            console.log('[Agent API] 第', dayIndex + 1, '天保存成功, ID:', dayRecord.id)
 
             // 保存 activities
             if (day.segments && day.segments.length > 0) {
@@ -398,8 +355,6 @@ export async function POST(request: NextRequest) {
 
               if (activitiesError) {
                 console.error('[Agent API] 保存活动失败:', activitiesError)
-              } else {
-                console.log('[Agent API] 保存', activities.length, '个活动成功')
               }
             }
           }
@@ -410,8 +365,6 @@ export async function POST(request: NextRequest) {
           .from('conversation_sessions')
           .update({ itinerary_id: newItinerary.id })
           .eq('id', session.id)
-          
-        console.log('[Agent API] 完整行程计划保存完成')
       } else {
         console.error('[Agent API] 保存行程失败:', itineraryError)
       }
