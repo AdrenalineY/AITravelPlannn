@@ -54,15 +54,21 @@ export class ReactAgent {
 **参数**:
   - 起点: 出发地点名称
   - 终点: 目的地名称
-  - 交通方式: driving(驾车) | walking(步行) | transit(公交) | bicycling(骑行)
-**用途**: 获取两地之间的距离、耗时和预估交通费用
+  - 交通方式: driving(驾车) | walking(步行) | transit(公交/地铁) | bicycling(骑行)
+**用途**: 获取两地之间的距离、耗时、路线方案和预估交通费用
+**返回信息**: 包含距离、时间、具体路线(如地铁线路、公交车号)、换乘方案等详细信息
 **重要提示**: 
-  - 使用高德地图路径规划2.0 API
+  - 使用高德地图路径规划2.0 API,返回详细的换乘方案
   - 起终点尽量使用具体地点名称(如"故宫博物院"而非"故宫")
   - 两点距离不宜过远(同城或相邻城市),否则可能超出API限制
+  - **交通方式选择原则**:
+    * 距离 <= 1km: 使用 walking(步行)
+    * 距离 > 1km: 优先使用 transit(公共交通),返回地铁线路或公交车号
+    * 如需驾车可使用 driving,但市内出行优先公共交通
 **示例**: 
   - Action: calculate_distance: 天安门广场, 故宫博物院, walking
-  - Action: calculate_distance: 北京站, 颐和园, transit
+  - Action: calculate_distance: 北京站, 颐和园, transit  (返回地铁4号线等具体方案)
+  - Action: calculate_distance: 王府井, 颐和园, transit  (返回地铁1号线转4号线等)
 
 ### 2. search_nearby - 搜索周边配套设施
 **格式**: Action: search_nearby: 城市+地点, 类别, 半径(可选)
@@ -110,21 +116,23 @@ export class ReactAgent {
 - **合理使用半径**: 市区内用1000-2000米,郊区可用3000-5000米
 
 ## 工作流程建议(单城市旅游)
-**第1-3轮(规划框架)**:
+**前几轮(规划框架)**:
 1. **确定住宿区域**: 分析景点分布和交通,选择中心位置作为住宿区域
 2. **制定时段框架**: 列出每天的时段安排表(如: 第1天上午/下午/晚上,第2天上午/下午/晚上...)
 3. **分配景点**: 将知识库中的景点分配到各时段,同一天的景点地理位置接近
-4. **预留休息**: 适当空出上午或晚上时段,或安排购物、自由活动
+4. **规划交通连接**: 在每两个景点/活动之间,插入交通环节(transport segment)
+5. **预留休息**: 适当空出上午或晚上时段,或安排购物、自由活动
 
-**第4-8轮(补充细节)**:
-5. **查找住宿**: 使用 search_nearby: 城市+住宿区域, hotel
-6. **查找餐饮**: 为需要用餐的时段,使用 search_nearby: 城市+景点, restaurant, 1000
-7. **计算交通**: 使用 calculate_distance 计算关键景点间的距离和时间
-8. **估算费用**: 使用 estimate_cost 估算住宿、餐饮、交通等费用
+**中间轮次(批量查询细节 - 提高效率)**:
+6. **批量查询餐饮**: 一次性列出所有需要用餐的地点,然后并行调用多次 search_nearby
+   - 例如: 同时查询"北京故宫,restaurant"和"北京颐和园,restaurant"和"北京天坛,restaurant"
+7. **批量计算交通**: 列出所有景点间的交通需求,然后并行调用多次 calculate_distance
+   - 例如: 同时查询"天安门→故宫,transit"和"故宫→颐和园,transit"
+8. **查找住宿**: 使用 search_nearby: 城市+住宿区域, hotel
 
-**第9-10轮(完成规划)**:
+**最后一轮(完成规划)**:
 9. 整合所有信息,完善行程细节
-10. 输出完整的 Answer
+10. 输出完整的 Answer,确保每个transport segment包含详细的交通方式(地铁线路/公交车号)
 
 ## 输出要求
 最终 Answer 必须包含:
@@ -153,25 +161,32 @@ Answer:
 
 **第1天: 天安门广场-故宫博物院**
 - 上午: 天安门广场游览
-- 午餐: 故宫周边 - 老北京炸酱面(评分4.6,人均60元,步行5分钟)
-- 下午: 故宫博物院(从天安门步行10分钟)
+- 交通: 步行10分钟至故宫(距离800米)
+- 午餐: 故宫周边 - 老北京炸酱面(评分4.6,人均60元)
+- 交通: 午餐后步行5分钟返回故宫
+- 下午: 故宫博物院游览
+- 交通: 地铁1号线(天安门东站→王府井站),约5分钟,票价3元
 - 晚餐: 王府井美食街 - 东来顺涮羊肉(评分4.5,人均80元)
-- 晚上: 休息或王府井夜景漫步
-- 交通: 天安门到故宫步行800米约10分钟
+- 晚上: 王府井夜景漫步或返回酒店休息
+- 交通: 地铁1号线返回酒店,约15分钟,票价3元
 
 **第2天: 八达岭长城**
-- 上午: 八达岭长城游览(巴士往返约4小时)
+- 交通: 地铁2号线至积水潭站,换乘877路公交(德胜门发车),约2小时到达长城,单程票价12元
+- 上午: 八达岭长城游览
 - 午餐: 长城景区餐厅(人均50元)
-- 下午: 返回市区,适当休息
+- 下午: 游览长城后半程
+- 交通: 877路公交返回德胜门,约2小时,票价12元
+- 交通: 地铁2号线(积水潭站→王府井附近),约30分钟,票价3元
 - 晚餐: 酒店附近 - 便宜坊烤鸭(评分4.6,人均120元)
 - 晚上: 自由活动或早休息
-- 交通: 酒店到德胜门约8km,地铁30分钟;德胜门到长城巴士70km约2小时
 
 **第3天: 颐和园-返程**
+- 交通: 地铁4号线(王府井换乘,西单站转4号线),至北宫门站,约40分钟,票价4元
 - 上午: 颐和园游览
 - 午餐: 颐和园周边 - 花家怡园(评分4.5,人均60元)
-- 下午: 自由活动或返程准备
-- 交通: 酒店到颐和园约15km,地铁40分钟
+- 交通: 步行返回颐和园继续游览(约10分钟)
+- 下午: 颐和园游览或返程准备
+- 交通: 地铁4号线返回市区,约40分钟,票价4元
 
 **住宿安排**
 - 区域: 王府井地区
@@ -284,42 +299,57 @@ Answer:
         // 记录消息(后续会根据类型分类)
         await this.saveMessage('thought', result, turn + 1)
 
-        // 解析 Action
-        const action = this.parseAction(result)
+        // 解析 Action (支持多个)
+        const actions = this.parseMultipleActions(result)
 
-        if (action && turn + 1 < maxTurns) {
+        if (actions.length > 0 && turn + 1 < maxTurns) {
           // 有 Action 且不是最后一轮 - 执行工具调用
-          console.log(`[ReactAgent] Action: ${action.action}`)
-          console.log(`[ReactAgent] Input: ${action.actionInput}`)
+          console.log(`[ReactAgent] 检测到 ${actions.length} 个工具调用`)
+          
+          const observations: string[] = []
+          
+          // 并行执行多个工具调用
+          const toolPromises = actions.map(async (action, index) => {
+            console.log(`[ReactAgent] Action ${index + 1}: ${action.action}`)
+            console.log(`[ReactAgent] Input ${index + 1}: ${action.actionInput}`)
 
-          const startTime = Date.now()
-          const toolResult = await AgentTools.executeAction(action.action, action.actionInput)
-          const executionTime = Date.now() - startTime
+            const startTime = Date.now()
+            const toolResult = await AgentTools.executeAction(action.action, action.actionInput)
+            const executionTime = Date.now() - startTime
 
-          console.log(`[ReactAgent] Observation: ${toolResult.observation}`)
+            console.log(`[ReactAgent] Observation ${index + 1}: ${toolResult.observation}`)
 
-          // 保存工具调用记录
-          await this.supabase.from('agent_tool_calls').insert({
-            agent_run_id: this.agentRunId,
-            turn_number: turn + 1,
-            tool_name: action.action,
-            tool_input: action.actionInput,
-            tool_output: JSON.stringify(toolResult.payload),
-            observation: toolResult.observation,
-            execution_time_ms: executionTime
+            // 保存工具调用记录
+            await this.supabase.from('agent_tool_calls').insert({
+              agent_run_id: this.agentRunId,
+              turn_number: turn + 1,
+              tool_name: action.action,
+              tool_input: action.actionInput,
+              tool_output: JSON.stringify(toolResult.payload),
+              observation: toolResult.observation,
+              execution_time_ms: executionTime
+            })
+
+            return `工具${index + 1} [${action.action}]: ${toolResult.observation}`
           })
-
+          
+          // 等待所有工具调用完成
+          const toolResults = await Promise.all(toolPromises)
+          
+          // 合并所有观察结果
+          const combinedObservation = toolResults.join('\n\n')
+          
           // 保存 observation 消息
-          await this.saveMessage('observation', toolResult.observation, turn + 1)
+          await this.saveMessage('observation', combinedObservation, turn + 1)
 
           // 将观察结果反馈给 LLM
           this.messages.push({
             role: 'user',
-            content: `Observation: ${toolResult.observation}`
+            content: `Observation: ${combinedObservation}`
           })
-        } else if (action && turn + 1 === maxTurns) {
+        } else if (actions.length > 0 && turn + 1 === maxTurns) {
           // 最后一轮但仍然有 Action - 强制提取 Answer
-          console.log(`[ReactAgent] 最后一轮检测到 Action,强制提取 Answer`)
+          console.log(`[ReactAgent] 最后一轮检测到 ${actions.length} 个Action,强制提取 Answer`)
           const finalAnswer = this.extractFinalAnswer(result) || '抱歉,未能在规定轮次内完成完整规划。请提供更多信息或简化需求。'
           
           await this.saveMessage('answer', finalAnswer, turn + 1)
@@ -533,7 +563,7 @@ ${planFormatted}
   }
 
   /**
-   * 解析 Action 指令
+   * 解析 Action 指令 (支持多个Action)
    * 对应 Python 版本的 _parse_action
    */
   private parseAction(result: string): AgentAction | null {
@@ -548,6 +578,25 @@ ${planFormatted}
     }
 
     return null
+  }
+
+  /**
+   * 解析多个 Action 指令
+   * 支持在一轮中执行多个工具调用
+   */
+  private parseMultipleActions(result: string): AgentAction[] {
+    const actions: AgentAction[] = []
+    const actionRegex = /^Action:\s*(\w+):\s*(.*)$/gm
+    let match
+    
+    while ((match = actionRegex.exec(result)) !== null) {
+      actions.push({
+        action: match[1],
+        actionInput: match[2].trim()
+      })
+    }
+    
+    return actions
   }
 
   /**

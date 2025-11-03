@@ -247,6 +247,27 @@ export function HorizontalTimeline({ itinerary }: HorizontalTimelineProps) {
                     <Text>¥{selectedSegment.transportDetails.cost}</Text>
                   </Col>
                 )}
+                {selectedSegment.transportDetails.line && (
+                  <Col span={24}>
+                    <Text type="secondary">线路:</Text>
+                    <br />
+                    <Text strong style={{ color: '#1890ff' }}>{selectedSegment.transportDetails.line}</Text>
+                  </Col>
+                )}
+                {selectedSegment.transportDetails.route && (
+                  <Col span={24}>
+                    <Text type="secondary">具体路线:</Text>
+                    <br />
+                    <Text>{selectedSegment.transportDetails.route}</Text>
+                  </Col>
+                )}
+                {selectedSegment.transportDetails.notes && (
+                  <Col span={24}>
+                    <Text type="secondary">备注:</Text>
+                    <br />
+                    <Text style={{ color: '#666' }}>{selectedSegment.transportDetails.notes}</Text>
+                  </Col>
+                )}
               </Row>
               {selectedSegment.transportDetails.notes && (
                 <div className="mt-2 p-2 bg-blue-50 rounded">

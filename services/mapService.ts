@@ -247,12 +247,13 @@ class MapService {
   /**
    * 路线规划 - 使用高德路径规划2.0 API
    * 支持驾车、步行、骑行、公交多种交通方式
+   * 返回详细的交通方式信息(地铁线路、公交车号等)
    */
   async planRoute(
     origin: Location,
     destination: Location,
     mode: 'driving' | 'walking' | 'bicycling' | 'transit' = 'driving'
-  ): Promise<Route | null> {
+  ): Promise<(Route & { transitDetails?: string; routeDescription?: string }) | null> {
     if (!this.webServiceKey) {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
@@ -278,6 +279,7 @@ class MapService {
         // 简化处理:使用全国通用代码,实际应该根据坐标获取城市代码
         params.append('city1', '010')  // 北京citycode
         params.append('city2', '010')
+        params.append('show_fields', 'cost,tmcs,navi,cities,polyline')
       }
 
       const apiMode = modeMap[mode]
@@ -286,7 +288,7 @@ class MapService {
       console.log(`[MapService] 路径规划: ${apiUrl}?${params}`)
 
       const response = await fetch(`${apiUrl}?${params}`)
-      const data: AmapRouteResponse = await response.json()
+      const data: any = await response.json()
 
       console.log(`[MapService] 路径规划响应:`, { status: data.status, info: data.info })
 
@@ -294,17 +296,54 @@ class MapService {
         throw new Error(data.info || '路线规划失败')
       }
 
-      // 公交路线返回结构不同
+      // 公交路线返回结构不同,包含详细的换乘信息
       if (mode === 'transit') {
         const transit = data.route?.transits?.[0]
         if (!transit) {
           throw new Error('未找到公交路线')
         }
+        
+        // 解析公交路线的详细信息
+        let transitDetails = ''
+        const routeParts: string[] = []
+        
+        if (transit.segments && Array.isArray(transit.segments)) {
+          transit.segments.forEach((seg: any, idx: number) => {
+            // 步行段
+            if (seg.walking) {
+              const walkDist = Math.round(parseFloat(seg.walking.distance || 0))
+              if (walkDist > 0) {
+                routeParts.push(`步行${walkDist}米`)
+              }
+            }
+            
+            // 公交/地铁段
+            if (seg.bus && seg.bus.buslines && seg.bus.buslines.length > 0) {
+              const busline = seg.bus.buslines[0]
+              const type = busline.type  // 地铁/公交
+              const name = busline.name  // 线路名称(如"地铁1号线")
+              const departure = busline.departure_stop?.name || '起点'
+              const arrival = busline.arrival_stop?.name || '终点'
+              const viaNum = busline.via_num || 0  // 经过站数
+              
+              if (type === '1') {  // 地铁
+                routeParts.push(`${name}(${departure}站上车→${arrival}站下车,${viaNum}站)`)
+              } else {  // 公交
+                routeParts.push(`${name}(${departure}站→${arrival}站,${viaNum}站)`)
+              }
+            }
+          })
+        }
+        
+        transitDetails = routeParts.join(' → ')
+        
         return {
           distance: parseFloat(transit.distance || '0'),
-          duration: parseFloat(transit.cost?.duration || transit.duration || '0'),
+          duration: parseFloat(transit.duration || '0'),
           polyline: '',
           steps: [],
+          transitDetails,
+          routeDescription: transitDetails,
         }
       }
 

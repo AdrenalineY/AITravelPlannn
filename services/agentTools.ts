@@ -74,6 +74,8 @@ export class AgentTools {
         cost = `约 ${Math.ceil(parseFloat(distanceKm) * 0.3)} 元`
       } else if (mode === 'walking') {
         cost = '免费'
+      } else if (mode === 'bicycling') {
+        cost = '免费'
       }
 
       const output: DistanceToolOutput = {
@@ -83,13 +85,29 @@ export class AgentTools {
         mode
       }
 
-      const observation = `从 ${origin} 到 ${destination} ${mode === 'driving' ? '驾车' : mode === 'transit' ? '乘坐公交' : mode === 'walking' ? '步行' : '骑行'}约 ${distanceKm} 公里,需要 ${durationMin} 分钟,费用${cost}`
+      // 构建详细的observation,包含交通方式的详细信息
+      let observation = `从 ${origin} 到 ${destination}`
+      
+      if (mode === 'transit' && routeInfo.transitDetails) {
+        // 公交/地铁模式:显示详细的换乘方案
+        observation += ` 乘坐公共交通约 ${distanceKm} 公里,需要 ${durationMin} 分钟,费用${cost}\n换乘方案: ${routeInfo.transitDetails}`
+      } else if (mode === 'driving') {
+        observation += ` 驾车约 ${distanceKm} 公里,需要 ${durationMin} 分钟,费用${cost}`
+      } else if (mode === 'walking') {
+        observation += ` 步行约 ${distanceKm} 公里,需要 ${durationMin} 分钟,${cost}`
+      } else if (mode === 'bicycling') {
+        observation += ` 骑行约 ${distanceKm} 公里,需要 ${durationMin} 分钟,${cost}`
+      }
 
       console.log(`[AgentTools] calculateDistance completed in ${Date.now() - startTime}ms`)
 
       return {
         observation,
-        payload: output
+        payload: {
+          ...output,
+          transitDetails: routeInfo.transitDetails,
+          routeDescription: routeInfo.routeDescription,
+        }
       }
     } catch (error: any) {
       console.error('[AgentTools] calculateDistance error:', error)
@@ -478,14 +496,20 @@ ${naturalLanguagePlan}
           "costEstimate": 费用,
           "rating": 评分,
           "tips": ["小贴士"],
-          "distanceInfo": {
+          
+          // 如果 type === "transport", 必须包含以下字段:
+          "transportMode": "walk|subway|bus|taxi|car|train|flight|bike",
+          "transportDetails": {
             "from": "起点",
             "to": "终点",
-            "mode": "walk|subway|bus|taxi|car",
-            "duration": "时长文本",
-            "distance": "距离文本",
-            "cost": 费用
+            "distance": "距离(如: 2.5km)",
+            "duration": "时长(如: 30分钟)",
+            "cost": 费用,
+            "route": "具体路线(如: 地铁1号线,天安门东站→王府井站)",
+            "line": "线路名称(如: 地铁1号线, 877路公交)",
+            "notes": "换乘说明或其他备注"
           },
+          
           "bookingInfo": {
             "required": true/false,
             "advanceTime": "提前预订时间"

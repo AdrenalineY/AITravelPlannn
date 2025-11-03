@@ -208,15 +208,13 @@ export default function DashboardPage() {
           setExtractedPlanCard(result.planExtracted)
           setPendingQuestions(result.planExtracted.pendingQuestions || [])
           
-          // 保存到数据库
-          try {
-            console.log('[Dashboard] Saving itinerary card to database...')
-            await itineraryCardService.create(result.planExtracted)
-            console.log('[Dashboard] Itinerary card saved successfully')
+          // 🔧 修复: 后端已经保存了行程数据,前端不需要重复保存
+          // Agent API 在 /api/agent/run 中已经完整保存了 itinerary (包括 days 和 activities)
+          // 这里只需要显示提示,避免重复创建卡片
+          console.log('[Dashboard] 行程数据已由后端保存, itineraryId:', result.itineraryId)
+          
+          if (result.itineraryId) {
             message.success('行程已自动保存!')
-          } catch (saveError: any) {
-            console.error('[Dashboard] Failed to save itinerary card:', saveError)
-            message.warning('行程生成成功,但保存失败: ' + saveError.message)
           }
           
           // 显示提示
