@@ -376,10 +376,12 @@ export interface ItineraryCard {
   cities?: string[]   // 涉及的城市列表
   
   // 时间信息
-  startDate: string   // 开始日期 YYYY-MM-DD
-  endDate: string     // 结束日期 YYYY-MM-DD
-  totalDays: number   // 总天数
-  totalNights: number // 总晚数
+  startDate?: string | null  // 开始日期 YYYY-MM-DD (可选,待确定)
+  endDate?: string | null    // 结束日期 YYYY-MM-DD (可选,待确定)
+  totalDays?: number | null  // 总天数(从日期计算,可能为空)
+  totalNights?: number | null // 总晚数(从日期计算,可能为空)
+  durationDays?: number      // 行程天数(独立字段,如"3天2晚"中的3)
+  durationNights?: number    // 行程晚数(独立字段,如"3天2晚"中的2)
   
   // 人员信息
   travelers: number          // 出行人数
@@ -444,6 +446,7 @@ export interface ItineraryCard {
     segments: Array<{
       order: number            // 顺序
       time: string             // 时间 'HH:mm' 或 'HH:mm-HH:mm'
+      timePeriod?: 'morning' | 'afternoon' | 'evening' | 'night'  // 时段
       type: 'transport' | 'activity' | 'meal' | 'rest' | 'accommodation'
       title: string            // 标题
       location: string         // 地点
@@ -457,6 +460,23 @@ export interface ItineraryCard {
       costEstimate?: number    // 费用估算
       rating?: number          // 评分
       tips?: string[]          // 小贴士
+      // 用餐信息 (当 type='meal' 时)
+      mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+      cuisine?: string         // 菜系
+      restaurant?: string      // 餐厅名称
+      signature?: string[]     // 招牌菜
+      // 交通信息 (当 type='transport' 时)
+      transportMode?: 'walk' | 'subway' | 'bus' | 'taxi' | 'car' | 'flight' | 'train' | 'bike' | 'ship'
+      transportDetails?: {
+        from: string
+        to: string
+        duration?: string
+        distance?: string
+        cost?: number
+        departureTime?: string
+        arrivalTime?: string
+        notes?: string
+      }
       distanceInfo?: {
         from: string
         to: string
@@ -529,9 +549,12 @@ export interface ItineraryCard {
   // 元数据
   rawPlan?: string               // 原始自然语言计划(前500字)
   fullPlan?: string              // 完整自然语言计划
+  planDescription?: string       // Agent最后一次输出的完整旅行计划自然语言描述
   status?: 'draft' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'
   tags?: string[]                // 标签
   shareUrl?: string              // 分享链接
+  coverImage?: string            // 封面图
+  isPublic?: boolean             // 是否公开
   createdAt?: string
   updatedAt?: string
   version?: number               // 版本号(用于行程修改历史)

@@ -233,33 +233,187 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 如果提取到了行程计划,保存到 itineraries 表
+    // 如果提取到了行程计划,保存完整数据到 itineraries 表
     let itineraryId = session.itinerary_id
     if (result.planExtracted && !session.itinerary_id) {
+      console.log('[Agent API] 保存完整行程计划...')
+      
+      // 🔧 修复: 使用完整的 planExtracted 数据,包括 days
+      const planData = {
+        ...result.planExtracted,
+        userId: user.id, // 确保 userId 设置正确
+      }
+      
+      // 转换为 API 格式 (camelCase)
+      const apiPayload = {
+        sessionId: session.id,
+        userId: user.id,
+        title: planData.title || '旅行计划',
+        destination: planData.destination,
+        cities: planData.cities || [],
+        startDate: planData.startDate,
+        endDate: planData.endDate,
+        durationDays: planData.durationDays || planData.totalDays || (planData.days?.length),  // 新增
+        durationNights: planData.durationNights || planData.totalNights || (planData.days?.length ? planData.days.length - 1 : null),  // 新增
+        travelers: planData.travelers || 1,
+        travelersDetail: planData.travelersDetail || {},
+        preferences: planData.preferences || [],
+        travelStyle: planData.travelStyle,
+        specialRequests: planData.specialRequests || [],
+        theme: planData.theme,
+        totalBudget: planData.totalBudget || 0,
+        budgetPerPerson: planData.budgetPerPerson,
+        currency: planData.currency || 'CNY',
+        estimatedCost: planData.estimatedCost || {},
+        accommodation: planData.accommodation || {},
+        days: planData.days || [], // ✅ 包含完整的 days 数据
+        tips: planData.tips || {},
+        foodRecommendations: planData.foodRecommendations || [],
+        shoppingSpots: planData.shoppingSpots || [],
+        transportationSummary: planData.transportationSummary || {},
+        fullPlan: planData.fullPlan || result.finalAnswer,
+        rawPlan: planData.rawPlan || '',
+        planDescription: result.finalAnswer,  // 新增: 保存 Agent 最后输出的完整描述
+        status: 'draft',
+        tags: planData.tags || [],
+        isPublic: false,
+        version: 1,
+      }
+      
+      console.log('[Agent API] API Payload:', {
+        title: apiPayload.title,
+        destination: apiPayload.destination,
+        daysCount: apiPayload.days?.length,
+        travelers: apiPayload.travelers,
+      })
+      
+      // 调用 itinerary-cards API 来保存完整数据 (包括 days 和 activities)
       const { data: newItinerary, error: itineraryError } = await supabase
         .from('itineraries')
         .insert({
+          session_id: session.id,
           user_id: user.id,
-          title: result.planExtracted.title || '旅行计划',
-          destination: result.planExtracted.destination,
-          start_date: result.planExtracted.startDate,
-          end_date: result.planExtracted.endDate,
-          travelers: result.planExtracted.travelers,
-          total_budget: result.planExtracted.totalBudget,
-          preferences: result.planExtracted.preferences,
+          title: apiPayload.title,
+          destination: apiPayload.destination,
+          cities: apiPayload.cities,
+          start_date: apiPayload.startDate,
+          end_date: apiPayload.endDate,
+          travelers: apiPayload.travelers,
+          travelers_detail: apiPayload.travelersDetail,
+          preferences: apiPayload.preferences,
+          travel_style: apiPayload.travelStyle,
+          special_requests: apiPayload.specialRequests,
+          theme: apiPayload.theme,
+          budget: apiPayload.totalBudget,
+          budget_per_person: apiPayload.budgetPerPerson,
+          currency: apiPayload.currency,
+          estimated_cost: apiPayload.estimatedCost,
+          accommodation: apiPayload.accommodation,
+          tips: apiPayload.tips,
+          food_recommendations: apiPayload.foodRecommendations,
+          shopping_spots: apiPayload.shoppingSpots,
+          transportation_summary: apiPayload.transportationSummary,
+          notes: apiPayload.fullPlan,
           status: 'draft',
+          tags: apiPayload.tags,
+          is_public: false,
+          version: 1,
         })
         .select()
         .single()
 
       if (!itineraryError && newItinerary) {
         itineraryId = newItinerary.id
+        console.log('[Agent API] 行程主表保存成功:', itineraryId)
+
+        // 保存 days 和 activities
+        if (apiPayload.days && apiPayload.days.length > 0) {
+          console.log('[Agent API] 保存', apiPayload.days.length, '天行程数据...')
+          
+          for (let dayIndex = 0; dayIndex < apiPayload.days.length; dayIndex++) {
+            const day = apiPayload.days[dayIndex]
+            
+            // 计算日期
+            let dayDate = day.date
+            if (!dayDate && apiPayload.startDate) {
+              const startDate = new Date(apiPayload.startDate)
+              startDate.setDate(startDate.getDate() + dayIndex)
+              dayDate = startDate.toISOString().split('T')[0]
+            }
+            if (!dayDate) {
+              const today = new Date()
+              today.setDate(today.getDate() + dayIndex)
+              dayDate = today.toISOString().split('T')[0]
+            }
+            
+            const { data: dayRecord, error: dayError } = await supabase
+              .from('itinerary_days')
+              .insert({
+                itinerary_id: newItinerary.id,
+                day_number: day.dayNumber || dayIndex + 1,
+                date: dayDate,
+                title: day.title || `第${dayIndex + 1}天`,
+                summary: day.summary,
+                highlights: day.highlights || [],
+                total_distance: day.totalDistance,
+                total_duration: day.totalDuration,
+                total_cost: day.segments?.reduce((sum: number, seg: any) => sum + (seg.costEstimate || 0), 0) || 0,
+              })
+              .select()
+              .single()
+
+            if (dayError) {
+              console.error('[Agent API] 保存第', dayIndex + 1, '天失败:', dayError)
+              continue
+            }
+            
+            console.log('[Agent API] 第', dayIndex + 1, '天保存成功, ID:', dayRecord.id)
+
+            // 保存 activities
+            if (day.segments && day.segments.length > 0) {
+              const activities = day.segments.map((segment: any, segIndex: number) => ({
+                day_id: dayRecord.id,
+                order: segment.order || segIndex + 1,
+                time: segment.time,
+                activity_type: segment.type,
+                poi_id: segment.poiId,
+                poi_name: segment.title,
+                location_lng: segment.coordinates?.lng,
+                location_lat: segment.coordinates?.lat,
+                address: segment.address,
+                category: segment.category,
+                description: segment.description,
+                notes: segment.notes,
+                cost: segment.costEstimate,
+                duration: segment.duration,
+                rating: segment.rating,
+                tips: segment.tips || [],
+                distance_info: segment.distanceInfo || {},
+                booking_info: segment.bookingInfo || {},
+              }))
+
+              const { error: activitiesError } = await supabase
+                .from('itinerary_activities')
+                .insert(activities)
+
+              if (activitiesError) {
+                console.error('[Agent API] 保存活动失败:', activitiesError)
+              } else {
+                console.log('[Agent API] 保存', activities.length, '个活动成功')
+              }
+            }
+          }
+        }
 
         // 更新会话关联的行程 ID
         await supabase
           .from('conversation_sessions')
           .update({ itinerary_id: newItinerary.id })
           .eq('id', session.id)
+          
+        console.log('[Agent API] 完整行程计划保存完成')
+      } else {
+        console.error('[Agent API] 保存行程失败:', itineraryError)
       }
     }
 

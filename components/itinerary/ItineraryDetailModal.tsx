@@ -42,6 +42,8 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons'
 import type { ItineraryCard } from '@/types'
+import { ItineraryTimeline } from './ItineraryTimeline'
+import { HorizontalTimeline } from './HorizontalTimeline'
 
 const { Title, Text, Paragraph } = Typography
 const { TabPane } = Tabs
@@ -65,7 +67,7 @@ export function ItineraryDetailModal({
 
   if (!itinerary) return null
 
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '未设定'
     const date = new Date(dateStr)
     return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
@@ -147,36 +149,42 @@ export function ItineraryDetailModal({
       </Card>
 
       {/* 预算信息 */}
-      {itinerary.estimatedCost && (
+      {(itinerary.estimatedCost || itinerary.totalBudget || itinerary.budgetPerPerson) && (
         <Card title="预算概览" size="small">
           <Row gutter={[16, 16]}>
-            <Col span={8}>
-              <div className="text-center">
-                <Text type="secondary">总预算</Text>
-                <div className="text-2xl font-bold text-green-600 mt-2">
-                  ¥{itinerary.totalBudget || itinerary.estimatedCost.total}
+            {itinerary.totalBudget && (
+              <Col span={8}>
+                <div className="text-center">
+                  <Text type="secondary">总预算</Text>
+                  <div className="text-2xl font-bold text-green-600 mt-2">
+                    ¥{itinerary.totalBudget}
+                  </div>
                 </div>
-              </div>
-            </Col>
-            <Col span={8}>
-              <div className="text-center">
-                <Text type="secondary">预估费用</Text>
-                <div className="text-2xl font-bold text-blue-600 mt-2">
-                  ¥{itinerary.estimatedCost.total}
+              </Col>
+            )}
+            {itinerary.estimatedCost?.total && (
+              <Col span={8}>
+                <div className="text-center">
+                  <Text type="secondary">预估费用</Text>
+                  <div className="text-2xl font-bold text-blue-600 mt-2">
+                    ¥{itinerary.estimatedCost.total}
+                  </div>
                 </div>
-              </div>
-            </Col>
-            <Col span={8}>
-              <div className="text-center">
-                <Text type="secondary">人均费用</Text>
-                <div className="text-2xl font-bold text-orange-600 mt-2">
-                  ¥{itinerary.budgetPerPerson || itinerary.estimatedCost.perPerson}
+              </Col>
+            )}
+            {(itinerary.budgetPerPerson || itinerary.estimatedCost?.perPerson) && (
+              <Col span={8}>
+                <div className="text-center">
+                  <Text type="secondary">人均费用</Text>
+                  <div className="text-2xl font-bold text-orange-600 mt-2">
+                    ¥{itinerary.budgetPerPerson || itinerary.estimatedCost?.perPerson}
+                  </div>
                 </div>
-              </div>
-            </Col>
+              </Col>
+            )}
           </Row>
 
-          {itinerary.estimatedCost.breakdown && itinerary.estimatedCost.breakdown.length > 0 && (
+          {itinerary.estimatedCost?.breakdown && itinerary.estimatedCost.breakdown.length > 0 && (
             <>
               <Divider />
               <Row gutter={[8, 8]}>
@@ -256,10 +264,12 @@ export function ItineraryDetailModal({
     </div>
   )
 
-  // 详细行程标签页
+  // 详细行程标签页 - 使用横向时间轴组件
   const renderItinerary = () => (
     <div className="space-y-4">
-      {itinerary.days && itinerary.days.length > 0 ? (
+      <HorizontalTimeline itinerary={itinerary} />
+      {/* 保留原有代码作为备用 */}
+      {false && itinerary.days && itinerary.days.length > 0 ? (
         itinerary.days.map((day, dayIdx) => (
           <Card
             key={dayIdx}

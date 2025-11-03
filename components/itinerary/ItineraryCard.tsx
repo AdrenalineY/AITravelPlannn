@@ -134,16 +134,21 @@ export function ItineraryCard({
               </span>
               <span>
                 <ClockCircleOutlined className="mr-1" />
-                {itinerary.totalDays || 0}天{itinerary.totalNights || 0}晚
+                {/* 优先显示独立的天数/晚数，其次显示计算的天数/晚数 */}
+                {itinerary.durationDays 
+                  ? `${itinerary.durationDays}天${itinerary.durationNights || 0}晚`
+                  : itinerary.totalDays 
+                    ? `${itinerary.totalDays}天${itinerary.totalNights || 0}晚` 
+                    : '时长待定'}
               </span>
               <span>
                 <TeamOutlined className="mr-1" />
-                {itinerary.travelers || 0}人
+                {itinerary.travelers || 1}人
               </span>
-              {itinerary.budgetPerPerson && (
+              {(itinerary.budgetPerPerson || itinerary.totalBudget) && (
                 <span>
                   <DollarOutlined className="mr-1" />
-                  ¥{itinerary.budgetPerPerson}/人
+                  ¥{itinerary.budgetPerPerson || itinerary.totalBudget}/人
                 </span>
               )}
             </Space>
@@ -250,7 +255,12 @@ export function ItineraryCard({
               <Space>
                 <ClockCircleOutlined className="text-gray-500" />
                 <Text>
-                  {itinerary.totalDays || 0}天{itinerary.totalNights || 0}晚
+                  {/* 优先显示独立的天数/晚数，其次显示计算的天数/晚数 */}
+                  {itinerary.durationDays 
+                    ? `${itinerary.durationDays}天${itinerary.durationNights || 0}晚`
+                    : itinerary.totalDays 
+                      ? `${itinerary.totalDays}天${itinerary.totalNights || 0}晚` 
+                      : '时长待定'}
                 </Text>
               </Space>
             </Tooltip>
@@ -259,8 +269,8 @@ export function ItineraryCard({
               <Space>
                 <TeamOutlined className="text-gray-500" />
                 <Text>
-                  {itinerary.travelers || 0}人
-                  {itinerary.travelersDetail && (
+                  {itinerary.travelers || 1}人
+                  {itinerary.travelersDetail && (itinerary.travelersDetail.adults || itinerary.travelersDetail.children) && (
                     <Text type="secondary" className="ml-1 text-xs">
                       ({itinerary.travelersDetail.adults || 0}大
                       {(itinerary.travelersDetail.children || 0) > 0 && ` ${itinerary.travelersDetail.children}小`})
@@ -270,12 +280,12 @@ export function ItineraryCard({
               </Space>
             </Tooltip>
 
-            {itinerary.budgetPerPerson && (
+            {(itinerary.budgetPerPerson || itinerary.totalBudget) && (
               <Tooltip title="人均预算">
                 <Space>
                   <DollarOutlined className="text-gray-500" />
                   <Text strong className="text-green-600">
-                    ¥{itinerary.budgetPerPerson}
+                    ¥{itinerary.budgetPerPerson || itinerary.totalBudget}
                   </Text>
                 </Space>
               </Tooltip>
