@@ -306,11 +306,12 @@ Answer:
           // 有 Action 且不是最后一轮 - 执行工具调用
           console.log(`[ReactAgent] 检测到 ${actions.length} 个工具调用`)
           
-          const observations: string[] = []
+          const toolResults: string[] = []
           
-          // 并行执行多个工具调用
-          const toolPromises = actions.map(async (action, index) => {
-            console.log(`[ReactAgent] Action ${index + 1}: ${action.action}`)
+          // 🔧 顺序执行工具调用(而非并发),避免触发高德API的QPS限制(3次/秒)
+          for (let index = 0; index < actions.length; index++) {
+            const action = actions[index]
+            console.log(`[ReactAgent] Action ${index + 1}/${actions.length}: ${action.action}`)
             console.log(`[ReactAgent] Input ${index + 1}: ${action.actionInput}`)
 
             const startTime = Date.now()
@@ -330,11 +331,10 @@ Answer:
               execution_time_ms: executionTime
             })
 
-            return `工具${index + 1} [${action.action}]: ${toolResult.observation}`
-          })
+            toolResults.push(`工具${index + 1} [${action.action}]: ${toolResult.observation}`)
+          }
           
-          // 等待所有工具调用完成
-          const toolResults = await Promise.all(toolPromises)
+          // 注意: mapService 内部已有 350ms 节流,无需在此处额外添加延迟
           
           // 合并所有观察结果
           const combinedObservation = toolResults.join('\n\n')
@@ -581,19 +581,55 @@ ${planFormatted}
   }
 
   /**
-   * 解析多个 Action 指令
+   * 解析 Action (支持多个)
    * 支持在一轮中执行多个工具调用
+   * 支持两种格式:
+   * 1. 每行一个: Action: tool1: params\nAction: tool2: params
+   * 2. 分号分隔: Action: tool1: params; tool2: params; tool3: params
    */
   private parseMultipleActions(result: string): AgentAction[] {
     const actions: AgentAction[] = []
-    const actionRegex = /^Action:\s*(\w+):\s*(.*)$/gm
+    
+    // 首先尝试匹配标准格式(每行一个 Action)
+    const lineRegex = /^Action:\s*(\w+):\s*(.*)$/gm
     let match
     
-    while ((match = actionRegex.exec(result)) !== null) {
-      actions.push({
-        action: match[1],
-        actionInput: match[2].trim()
-      })
+    while ((match = lineRegex.exec(result)) !== null) {
+      const actionInput = match[2].trim()
+      
+      // 检查是否包含分号(多工具在同一行)
+      if (actionInput.includes(';') && actionInput.includes(':')) {
+        // 分号分隔的多工具格式
+        // 例如: "tool1: params1; tool2: params2; tool3: params3"
+        const parts = actionInput.split(';').map(p => p.trim())
+        
+        // 第一部分直接添加
+        const firstToolMatch = parts[0].match(/^(\w+):\s*(.*)$/)
+        if (firstToolMatch) {
+          actions.push({
+            action: firstToolMatch[1],
+            actionInput: firstToolMatch[2].trim()
+          })
+        }
+        
+        // 剩余部分需要解析为独立的工具调用
+        for (let i = 1; i < parts.length; i++) {
+          const part = parts[i]
+          const toolMatch = part.match(/^(\w+):\s*(.*)$/)
+          if (toolMatch) {
+            actions.push({
+              action: toolMatch[1],
+              actionInput: toolMatch[2].trim()
+            })
+          }
+        }
+      } else {
+        // 标准单工具格式
+        actions.push({
+          action: match[1],
+          actionInput: actionInput
+        })
+      }
     }
     
     return actions

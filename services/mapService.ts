@@ -51,6 +51,42 @@ interface AmapRouteResponse {
 class MapService {
   private webServiceKey: string | null = null
   private baseUrl = 'https://restapi.amap.com/v3'
+  private lastRequestTime = 0
+  private minRequestInterval = 350 // 最小请求间隔(毫秒) - 限制 QPS 到 3/秒 (1000ms / 3 ≈ 333ms,加余量取350ms)
+
+  /**
+   * 请求节流: 确保两次请求之间有最小间隔
+   * 高德地图免费版限制: 3次/秒
+   */
+  private async throttleRequest(): Promise<void> {
+    const now = Date.now()
+    const timeSinceLastRequest = now - this.lastRequestTime
+    
+    if (timeSinceLastRequest < this.minRequestInterval) {
+      const delay = this.minRequestInterval - timeSinceLastRequest
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+    
+    this.lastRequestTime = Date.now()
+  }
+
+  /**
+   * 计算两点间直线距离(米) - Haversine 公式
+   */
+  private calculateStraightLineDistance(origin: Location, destination: Location): number {
+    const R = 6371000 // 地球半径(米)
+    const lat1 = origin.lat * Math.PI / 180
+    const lat2 = destination.lat * Math.PI / 180
+    const deltaLat = (destination.lat - origin.lat) * Math.PI / 180
+    const deltaLng = (destination.lng - origin.lng) * Math.PI / 180
+
+    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+    return Math.round(R * c)
+  }
 
   /**
    * 设置 Web服务 API Key (用于后端数据获取)
@@ -74,6 +110,9 @@ class MapService {
     if (!this.webServiceKey) {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
+
+    // 请求节流
+    await this.throttleRequest()
 
     try {
       const params = new URLSearchParams({
@@ -143,6 +182,9 @@ class MapService {
       showFields = 'business'  // 默认返回商业信息(评分、人均消费等)
     } = options
 
+    // 请求节流
+    await this.throttleRequest()
+
     try {
       // 使用POI搜索2.0周边搜索接口
       const params = new URLSearchParams({
@@ -164,12 +206,9 @@ class MapService {
 
       // POI搜索2.0使用新的baseUrl
       const apiUrl = 'https://restapi.amap.com/v5/place/around'
-      console.log(`[MapService] 周边搜索: ${apiUrl}?${params}`)
 
       const response = await fetch(`${apiUrl}?${params}`)
       const data: any = await response.json()
-
-      console.log(`[MapService] 周边搜索响应:`, { status: data.status, info: data.info, count: data.count })
 
       if (data.status !== '1') {
         throw new Error(data.info || '周边POI搜索失败')
@@ -210,6 +249,9 @@ class MapService {
     if (!this.webServiceKey) {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
+
+    // 请求节流
+    await this.throttleRequest()
 
     try {
       const params = new URLSearchParams({
@@ -258,6 +300,9 @@ class MapService {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
 
+    // 请求节流
+    await this.throttleRequest()
+
     try {
       // 路径规划2.0使用v5版本API
       const modeMap = {
@@ -285,14 +330,24 @@ class MapService {
       const apiMode = modeMap[mode]
       // 使用v5版本的路径规划API
       const apiUrl = `https://restapi.amap.com/v5/direction/${apiMode}`
-      console.log(`[MapService] 路径规划: ${apiUrl}?${params}`)
 
       const response = await fetch(`${apiUrl}?${params}`)
       const data: any = await response.json()
 
-      console.log(`[MapService] 路径规划响应:`, { status: data.status, info: data.info })
-
       if (data.status !== '1') {
+        // 特殊错误处理
+        if (data.info === 'RESOURCE_UNAVAILABLE') {
+          // 资源不可用,可能是距离太近或太远,尝试使用直线距离
+          const distance = this.calculateStraightLineDistance(origin, destination)
+          const duration = Math.round(distance / 1.2 * 60) // 假设步行速度 1.2m/s
+          return {
+            distance,
+            duration,
+            polyline: '', // 无法提供路径
+            steps: [], // 无法提供分步指引
+            routeDescription: `直线距离约 ${(distance / 1000).toFixed(1)} 公里(路径规划服务暂不可用,该距离可能不适合${mode === 'walking' ? '步行' : mode === 'bicycling' ? '骑行' : mode === 'driving' ? '驾车' : '公交'})`
+          }
+        }
         throw new Error(data.info || '路线规划失败')
       }
 
@@ -377,6 +432,9 @@ class MapService {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
 
+    // 请求节流
+    await this.throttleRequest()
+
     try {
       const params = new URLSearchParams({
         key: this.webServiceKey,
@@ -403,12 +461,15 @@ class MapService {
   }
 
   /**
-   * 逆地理编码 (坐标 -> 地址)
+   * 逆地理编码(坐标转地址)
    */
   async reverseGeocode(location: Location): Promise<string | null> {
     if (!this.webServiceKey) {
       throw new Error('高德地图 Web服务 API Key 未配置')
     }
+
+    // 请求节流
+    await this.throttleRequest()
 
     try {
       const params = new URLSearchParams({
