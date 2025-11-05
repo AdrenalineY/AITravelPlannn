@@ -54,15 +54,17 @@
 |------|------|----------|--------|
 | Phase 1 | 基础架构与认证 | 项目初始化、Supabase 集成、用户认证系统 | ✅ 100% |
 | Phase 2 | 核心功能开发 | AI 对话、地图集成、行程管理、ReAct Agent | ✅ 100% |
+| **Phase 2.5** | **数据库重构** | **简化数据结构、优化查询性能、保持功能完整性** | **🔄 进行中** |
 | Phase 3 | 高级功能与优化 | 语音交互、费用管理、移动端适配 | ⏳ 30% |
 | Phase 4 | 测试与上线 | 性能优化、测试、部署、文档完善 | 📋 计划中 |
 
 ### 2.2 整体进度
 - **总体完成度**: 约 75%
 - **核心功能**: 全部完成 ✅
+- **数据库重构**: 设计阶段 🔄
 - **UI/UX**: 桌面端完成,移动端进行中
 - **测试覆盖**: 计划中
-- **文档完善度**: 80%
+- **文档完善度**: 85%
 
 ---
 
@@ -1264,59 +1266,112 @@ useEffect(() => {
 
 ## 4. 数据库设计
 
-### 4.1 表结构总览
+### 4.1 ⚠️ 数据库重构计划
+
+**重构背景**: 当前数据库设计过于复杂，行程数据分散存储在多个表中，导致查询复杂、维护困难。
+
+**重构目标**:
+1. **简化数据结构**: 行程数据统一存储为 JSON，无需拆解
+2. **提升查询性能**: 减少 JOIN 操作，单表查询获取完整行程
+3. **保持对话历史**: 用户可在编辑行程时查看历史对话
+4. **便于维护**: 降低数据模型复杂度
+
+**重构方案**: 详见 `docs/SupaBase重构设计文档.md`
+
+---
+
+### 4.2 当前表结构 (待重构)
 | 表名 | 用途 | 字段数 | 关系 | 状态 |
 |------|------|--------|------|------|
 | users | 用户基本信息 | ~10 | 1:N → user_configs | ✅ |
 | user_configs | API 配置 | 8 | N:1 → users | ✅ |
-| itineraries | 行程主表 | 15 | N:1 → users, 1:N → segments | ✅ |
-| itinerary_segments | 行程分段(按天) | 10 | N:1 → itineraries, 1:N → activities | ✅ |
-| itinerary_activities | 行程活动 | 18 | N:1 → segments | ✅ |
-| conversation_sessions | 对话会话 | 8 | N:1 → users | ✅ |
+| itineraries | 行程主表 | 15 | N:1 → users, 1:N → segments | ⚠️ 待重构 |
+| itinerary_days | 行程分段(按天) | 10 | N:1 → itineraries, 1:N → activities | ⚠️ 待重构 |
+| itinerary_activities | 行程活动 | 18 | N:1 → segments | ⚠️ 待重构 |
+| conversation_sessions | 对话会话 | 8 | N:1 → users | ⚠️ 待重构 |
+| agent_runs | Agent 运行记录 | 12 | N:1 → sessions | ⚠️ 待重构 |
+| agent_messages | Agent 消息 | 8 | N:1 → runs | ⚠️ 待重构 |
 
-### 4.2 数据关系图
+### 4.3 新设计表结构 (重构后)
+| 表名 | 用途 | 核心字段 | 状态 |
+|------|------|----------|------|
+| **itinerary_cards** | 行程卡片主表 | `plan_data` (完整JSON) | 🆕 设计中 |
+| **conversation_sessions** | 对话会话(简化) | `user_preferences` (JSONB) | 🔄 简化中 |
+| **agent_runs** | Agent运行记录(简化) | `final_answer`, `plan_extracted` | 🔄 简化中 |
+| **conversation_messages** | 对话消息记录 | `role`, `content`, `sequence_number` | 🆕 新增 |
+| **agent_debug_logs** | Agent调试日志(可选) | `turn_number`, `log_type`, `content` | 🆕 新增 |
+
+### 4.4 重构优势对比
+
+#### 当前架构问题:
+- ❌ **复杂查询**: 需要 3-4 个表 JOIN 才能获取完整行程
+- ❌ **数据一致性**: 多表更新容易出现部分失败
+- ❌ **维护困难**: 外键关系复杂，变更成本高
+- ❌ **性能瓶颈**: 大量 JOIN 操作影响查询速度
+
+#### 新架构优势:
+- ✅ **单表查询**: 行程数据一次查询获取，性能大幅提升
+- ✅ **原子操作**: 行程数据作为整体进行保存，保证一致性
+- ✅ **扩展灵活**: JSON 字段支持 schema 演进，无需频繁 DDL
+- ✅ **维护简单**: 减少外键依赖，降低复杂度
+
+### 4.5 数据关系图对比
+
+**当前复杂架构**:
 ```
 users (1)
   ├─→ (N) user_configs (API配置)
-  ├─→ (N) itineraries (行程)
-  │        └─→ (N) itinerary_segments (分段/天)
-  │                 └─→ (N) itinerary_activities (活动)
-  └─→ (N) conversation_sessions (对话会话)
+  ├─→ (N) conversation_sessions (对话会话)
+  │    ├─→ (N) agent_runs (Agent运行)
+  │    │    ├─→ (N) agent_messages (消息)
+  │    │    └─→ (N) agent_tool_calls (工具调用)
+  │    └─→ (1) itineraries (行程)
+  │             └─→ (N) itinerary_days (天)
+  │                      └─→ (N) itinerary_activities (活动)
+  └─→ (N) profiles (资料)
 ```
 
-### 4.3 核心表结构说明
+**重构后简化架构**:
+```
+users (1)
+  ├─→ (N) user_configs (API配置) ✅
+  ├─→ (N) conversation_sessions (对话会话-简化) 🔄
+  │    ├─→ (N) conversation_messages (消息记录) 🆕
+  │    ├─→ (N) agent_runs (运行记录-简化) 🔄
+  │    └─→ (N) itinerary_cards (行程卡片) 🆕
+  │             └─ plan_data (完整JSON) 🆕
+  └─→ (N) profiles (资料) ✅
+```
 
-**`user_configs` - 用户配置表**:
-- `llm_config` (JSONB): LLM API 配置,AES加密
-- `speech_config` (JSONB): 语音API配置,AES加密  
-- `map_config` (JSONB): 地图API配置,AES加密
+### 4.6 核心表结构说明
 
-**`itineraries` - 行程主表**:
-- `title`, `destination`, `start_date`, `end_date`: 基本信息
-- `travelers`, `budget`, `currency`: 旅行参数
-- `status`: draft/confirmed/completed
-- `preferences` (JSONB): 用户偏好
-- `metadata` (JSONB): 元数据(来源、版本等)
+#### 保持不变的表
 
-**`itinerary_segments` - 分段表**:
-- `day_number`: 第几天
-- `date`: 日期
-- `total_cost`: 当日费用
-- `accommodation` (JSONB): 住宿信息
+**`user_configs` - 用户配置表** ✅:
+- `llm_api_key_encrypted`: LLM API 密钥,AES加密
+- `speech_api_key_encrypted`: 语音API密钥,AES加密  
+- `map_web_service_key_encrypted`: 地图Web服务密钥,AES加密
+- `map_js_api_key_encrypted`: 地图JS API密钥,AES加密
 
-**`itinerary_activities` - 活动表**:
-- `activity_order`: 排序
-- `activity_type`: 活动类型(sightseeing/dining/...)
-- `poi_name`, `address`: 地点信息
-- `location` (JSONB): 经纬度
-- `start_time`, `end_time`, `duration`: 时间信息
-- `cost`: 费用
-- `transportation` (JSONB): 交通方式
+#### 重构的表
 
-**`conversation_sessions` - 会话表**:
-- `messages` (JSONB): 消息历史数组
-- `user_preferences` (JSONB): 用户偏好
-- `agent_state` (JSONB): Agent 状态
+**`itinerary_cards` - 行程卡片主表** 🆕:
+- `plan_data` (JSONB): **完整的 ItineraryCard JSON**，包含所有天数、活动、费用等
+- `title`, `destination`: 基本信息（冗余存储，便于列表查询）
+- `total_budget`, `estimated_cost`: 预算信息（冗余存储）
+- `natural_plan`: Agent生成的自然语言描述
+
+**`conversation_messages` - 对话消息表** 🆕:
+- `session_id`: 会话ID
+- `role`: 消息角色 (user/assistant/system)  
+- `content`: 消息内容
+- `sequence_number`: 消息序号（保证显示顺序）
+
+**`agent_runs` - Agent运行记录** 🔄:
+- `user_message`: 用户输入
+- `final_answer`: Agent最终回答
+- `plan_extracted`: 提取的行程JSON
+- `context_data`: 简化的上下文信息
 
 ### 4.4 数据安全
 - ✅ Row Level Security (RLS) 启用
@@ -1800,15 +1855,49 @@ Supabase 提供内置认证,无需自定义 API 路由
 
 ## 13. 下一步计划
 
-### 短期目标 (1-2周)
+### 🔄 即将进行 - 数据库重构 (Phase 2.5)
+**优先级**: 🔥 高优先级
+**预计周期**: 1-2周
+**目标**: 简化数据结构，提升系统性能和可维护性
+
+#### 重构任务清单:
+- [ ] **迁移脚本编写** (2-3天)
+  - [ ] 创建新表结构 SQL
+  - [ ] 数据迁移脚本 (从旧表到新表)
+  - [ ] 数据完整性验证脚本
+  
+- [ ] **服务层重构** (3-4天)
+  - [ ] 更新 `itineraryService.ts` - 适配新数据模型
+  - [ ] 更新 `itineraryCardService.ts` - 简化行程操作
+  - [ ] 更新 `reactAgent.ts` - 适配新会话存储
+  - [ ] 新增 `conversationService.ts` - 对话历史管理
+  
+- [ ] **API 层更新** (2-3天)
+  - [ ] 更新 `app/api/itinerary-cards/route.ts`
+  - [ ] 更新 `app/api/agent/session/route.ts`
+  - [ ] 更新相关 API 端点
+  
+- [ ] **类型定义更新** (1天)
+  - [ ] 更新 `types/index.ts` - 数据库相关类型
+  - [ ] 确保类型安全和一致性
+  
+- [ ] **测试验证** (2-3天)
+  - [ ] 本地开发环境验证
+  - [ ] 功能完整性测试
+  - [ ] 性能对比测试
+  - [ ] 数据迁移验证
+
+### 短期目标 (重构后 1-2周)
 - [ ] 完成语音交互基础功能
-- [ ] 移动端适配优化
+- [ ] 移动端适配优化  
 - [ ] 性能监控接入
+- [ ] 重构后性能评估
 
 ### 中期目标 (1个月)
 - [ ] 完成费用管理模块
 - [ ] 添加用户协同功能
 - [ ] Beta 测试
+- [ ] 基于新架构的功能扩展
 
 ### 长期目标 (3个月)
 - [ ] 正式版本发布
@@ -1825,10 +1914,14 @@ Supabase 提供内置认证,无需自定义 API 路由
 - [高德地图 API](https://lbs.amap.com/api/)
 
 ### 14.2 项目文档
+- **数据库重构设计**: `docs/SupaBase重构设计文档.md` 🆕
 - 需求规格说明: `docs/requirement_specification.md`
 - 架构设计文档: `docs/REACT_AGENT_ARCHITECTURE_DESIGN.md`
+- Agent 使用指南: `docs/REACT_AGENT_USAGE_GUIDE.md`
 - 快速开始指南: `docs/QUICK_START.md`
-- [其他文档...]
+- 数据库集成: `docs/DATABASE_INTEGRATION_COMPLETE.md`
+- 地图迁移报告: `docs/MAP_MIGRATION_COMPLETION_REPORT.md`
+- [其他文档共30+篇...]
 
 ---
 
@@ -1858,9 +1951,20 @@ Supabase 提供内置认证,无需自定义 API 路由
 - 文档完善度: **80%**
 
 ### 15.4 数据库统计
-- 数据表: **6 张**
+**当前架构 (待重构)**:
+- 数据表: **8 张** (users, user_configs, itineraries, itinerary_days, itinerary_activities, conversation_sessions, agent_runs, agent_messages 等)
 - 迁移文件: **10+ 个**
 - RLS 策略: **20+ 条**
+
+**重构后架构 (设计中)**:
+- 核心数据表: **5 张** (简化 37.5%)
+  - `itinerary_cards` (新): 行程卡片主表，JSON 存储完整数据
+  - `conversation_sessions` (简化): 对话会话管理
+  - `conversation_messages` (新): 对话消息记录
+  - `agent_runs` (简化): Agent 运行记录
+  - `agent_debug_logs` (新,可选): 调试日志
+- 保留表: **2 张** (`user_configs`, `profiles`)
+- 预期性能提升: **查询速度提升 60%+** (减少 JOIN 操作)
 
 ### 15.5 技术栈组件
 - 前端框架: 1 (Next.js)
@@ -1900,11 +2004,12 @@ UI/UX           ███████████████████░  95
 ### 16.3 技术亮点总结
 1. 🤖 **完整的 ReAct Agent 实现** - 13+ 工具,智能规划
 2. 🗺️ **双地图服务集成** - 高德 + Mapbox
-3. 💾 **三层数据模型** - 灵活的行程管理
+3. 💾 **数据库架构演进** - 从复杂多表到简化 JSON 存储 🆕
 4. 🔐 **安全的配置管理** - AES 加密 + RLS
-5. 🎨 **现代化 UI/UX** - 响应式 + 拖拽交互
+5. 🎨 **现代化 UI/UX** - 响应式 + 拖拽交互  
 6. 🔄 **流式对话体验** - SSE 实时输出
 7. 📊 **可视化展示** - 地图 + 时间轴 + 图表
+8. ⚡ **性能优化设计** - 单表查询 + JSON 索引 🆕
 
 ---
 
