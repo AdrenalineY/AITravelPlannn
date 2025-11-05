@@ -8,9 +8,9 @@ import type { POI } from '@/types'
 // 高德地图 JS API 类型声明
 declare global {
   interface Window {
-    AMap: any
+    AMap?: any
     _AMapSecurityConfig?: {
-      securityJsCode?: string
+      securityJsCode: string
     }
   }
 }

@@ -213,7 +213,8 @@ export default function ItinerariesPage() {
   }
 
   const handleCreateNew = () => {
-    router.push('/dashboard')
+    // 跳转到新的行程编辑页面(空白状态)
+    router.push('/itinerary/edit')
   }
 
   const handleViewDetail = (itinerary: ItineraryCardType) => {
@@ -222,8 +223,13 @@ export default function ItinerariesPage() {
   }
 
   const handleEdit = (itinerary: ItineraryCardType) => {
-    message.info('编辑功能开发中')
-    // TODO: 跳转到编辑页面或打开编辑对话框
+    // 跳转到行程编辑页面,带上行程 ID 和会话 ID
+    const params = new URLSearchParams()
+    params.set('id', itinerary.id)
+    if (itinerary.sessionId) {
+      params.set('sessionId', itinerary.sessionId)
+    }
+    router.push(`/itinerary/edit?${params.toString()}`)
   }
 
   const handleShare = (itinerary: ItineraryCardType) => {
@@ -266,7 +272,11 @@ export default function ItinerariesPage() {
 
   const handleContinueChat = () => {
     if (selectedItinerary?.sessionId) {
-      router.push(`/dashboard?session=${selectedItinerary.sessionId}`)
+      // 跳转到行程编辑页面并加载历史对话
+      const params = new URLSearchParams()
+      params.set('id', selectedItinerary.id)
+      params.set('sessionId', selectedItinerary.sessionId)
+      router.push(`/itinerary/edit?${params.toString()}`)
     } else {
       message.warning('无法继续对话,会话信息丢失')
     }
@@ -422,7 +432,7 @@ export default function ItinerariesPage() {
           </div>
         )}
 
-        {/* 详情弹窗 */}
+        {/* 详情弹窗 - 包含概览/详细行程/美食/建议等标签页 */}
         <ItineraryDetailModal
           open={detailModalOpen}
           itinerary={selectedItinerary}

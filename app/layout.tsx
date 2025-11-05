@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { AntdRegistry } from '@ant-design/nextjs-registry'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import { AmapScriptLoader } from '@/components/map/AmapScriptLoader'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -22,6 +23,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <AntdRegistry>
           <ConfigProvider locale={zhCN}>
+            {/* 动态加载高德地图 JS API */}
+            <AmapScriptLoader />
             {children}
           </ConfigProvider>
         </AntdRegistry>

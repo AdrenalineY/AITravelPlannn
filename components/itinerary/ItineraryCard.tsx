@@ -134,12 +134,12 @@ export function ItineraryCard({
               </span>
               <span>
                 <ClockCircleOutlined className="mr-1" />
-                {/* 优先显示独立的天数/晚数，其次显示计算的天数/晚数 */}
-                {itinerary.durationDays 
-                  ? `${itinerary.durationDays}天${itinerary.durationNights || 0}晚`
-                  : itinerary.totalDays 
-                    ? `${itinerary.totalDays}天${itinerary.totalNights || 0}晚` 
-                    : '时长待定'}
+                {(() => {
+                  // 优先使用 durationDays/durationNights，其次使用 totalDays/totalNights，最后从 days 数组计算
+                  const days = itinerary.durationDays || itinerary.totalDays || itinerary.days?.length || 0
+                  const nights = itinerary.durationNights ?? itinerary.totalNights ?? (days > 0 ? days - 1 : 0)
+                  return days > 0 ? `${days}天${nights}晚` : '时长待定'
+                })()}
               </span>
               <span>
                 <TeamOutlined className="mr-1" />
@@ -271,12 +271,12 @@ export function ItineraryCard({
               <Space>
                 <ClockCircleOutlined className="text-gray-500" />
                 <Text>
-                  {/* 优先显示独立的天数/晚数，其次显示计算的天数/晚数 */}
-                  {itinerary.durationDays 
-                    ? `${itinerary.durationDays}天${itinerary.durationNights || 0}晚`
-                    : itinerary.totalDays 
-                      ? `${itinerary.totalDays}天${itinerary.totalNights || 0}晚` 
-                      : '时长待定'}
+                  {(() => {
+                    // 优先使用 durationDays/durationNights，其次使用 totalDays/totalNights，最后从 days 数组计算
+                    const days = itinerary.durationDays || itinerary.totalDays || itinerary.days?.length || 0
+                    const nights = itinerary.durationNights ?? itinerary.totalNights ?? (days > 0 ? days - 1 : 0)
+                    return days > 0 ? `${days}天${nights}晚` : '时长待定'
+                  })()}
                 </Text>
               </Space>
             </Tooltip>

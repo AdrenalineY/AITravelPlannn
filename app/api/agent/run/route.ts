@@ -205,12 +205,35 @@ export async function POST(request: NextRequest) {
 
     // 如果提取到了行程计划,保存完整数据到 itineraries 表
     let itineraryId = session.itinerary_id
+    
+    console.log('[Agent API] 检查行程保存条件:', {
+      hasPlanExtracted: !!result.planExtracted,
+      sessionItineraryId: session.itinerary_id,
+      willSave: !!(result.planExtracted && !session.itinerary_id)
+    })
+    
     if (result.planExtracted && !session.itinerary_id) {
-      // 🔧 修复: 使用完整的 planExtracted 数据,包括 days
-      const planData = {
-        ...result.planExtracted,
-        userId: user.id, // 确保 userId 设置正确
-      }
+      console.log('[Agent API] 开始保存行程到数据库...')
+      
+      // �️ 双重检查: 确认该 session 还没有关联的行程 (防止并发请求)
+      const { data: existingItinerary } = await supabase
+        .from('itineraries')
+        .select('id')
+        .eq('session_id', session.id)
+        .limit(1)
+        .maybeSingle()
+      
+      if (existingItinerary) {
+        console.log('[Agent API] ⚠️ 该会话已有关联行程,跳过保存:', existingItinerary.id)
+        itineraryId = existingItinerary.id
+      } else {
+        console.log('[Agent API] 确认无重复,继续保存...')
+      
+        // �🔧 修复: 使用完整的 planExtracted 数据,包括 days
+        const planData = {
+          ...result.planExtracted,
+          userId: user.id, // 确保 userId 设置正确
+        }
       
       // 转换为 API 格式 (camelCase)
       const apiPayload = {
@@ -285,7 +308,14 @@ export async function POST(request: NextRequest) {
 
       if (!itineraryError && newItinerary) {
         itineraryId = newItinerary.id
-        console.log('[Agent API] 行程主表保存成功:', itineraryId)
+        console.log('[Agent API] ✅ 行程主表保存成功:', itineraryId)
+        
+        // 🔧 立即更新会话关联，防止并发请求重复保存
+        await supabase
+          .from('conversation_sessions')
+          .update({ itinerary_id: newItinerary.id })
+          .eq('id', session.id)
+        console.log('[Agent API] ✅ 会话已关联行程ID')
 
         // 保存 days 和 activities
         if (apiPayload.days && apiPayload.days.length > 0) {
@@ -322,9 +352,10 @@ export async function POST(request: NextRequest) {
               .single()
 
             if (dayError) {
-              console.error('[Agent API] 保存第', dayIndex + 1, '天失败:', dayError)
+              console.error('[Agent API] ❌ 保存第', dayIndex + 1, '天失败:', dayError)
               continue
             }
+            console.log('[Agent API] ✅ 保存第', dayIndex + 1, '天成功')
 
             // 保存 activities
             if (day.segments && day.segments.length > 0) {
@@ -354,19 +385,18 @@ export async function POST(request: NextRequest) {
                 .insert(activities)
 
               if (activitiesError) {
-                console.error('[Agent API] 保存活动失败:', activitiesError)
+                console.error('[Agent API] ❌ 保存活动失败:', activitiesError)
+              } else {
+                console.log('[Agent API] ✅ 保存', activities.length, '个活动成功')
               }
             }
           }
         }
-
-        // 更新会话关联的行程 ID
-        await supabase
-          .from('conversation_sessions')
-          .update({ itinerary_id: newItinerary.id })
-          .eq('id', session.id)
-      } else {
-        console.error('[Agent API] 保存行程失败:', itineraryError)
+        
+        console.log('[Agent API] ✅ 行程完整数据保存完成')
+        } else {
+          console.error('[Agent API] ❌ 保存行程失败:', itineraryError)
+        }
       }
     }
 

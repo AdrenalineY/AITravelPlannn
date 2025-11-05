@@ -129,7 +129,8 @@ export class AgentTools {
 
       // 构建详细的observation,包含交通方式的详细信息
       // 使用实际找到的POI名称,更精确
-      let observation = `从 ${originPOI.name} 到 ${destPOI.name}`
+      // 使用 [POI:...] 标记包裹真实地点名称
+      let observation = `从 [POI:${originPOI.name}] 到 [POI:${destPOI.name}]`
       
       if (mode === 'transit' && routeInfo.transitDetails) {
         // 公交/地铁模式:显示详细的换乘方案
@@ -306,15 +307,16 @@ export class AgentTools {
       }
 
       // 构建详细的 observation,包含更多有用信息
+      // 使用 [POI:...] 标记包裹真实地址信息
       const resultsList = limitedResults.map((r: any) => {
-        const parts = [`${r.rank}. ${r.name}`]
+        const parts = [`${r.rank}. [POI:${r.name}]`]
         if (r.rating) parts.push(`评分${r.rating}`)
         if (r.distance) parts.push(r.distance)
         if (r.cost) parts.push(`人均${r.cost}元`)
         if (r.address && r.address !== '地址未知') {
           // 简化地址显示
           const shortAddr = r.address.length > 20 ? r.address.substring(0, 20) + '...' : r.address
-          parts.push(shortAddr)
+          parts.push(`地址:[POI:${shortAddr}]`)
         }
         return parts.join(' | ')
       }).join('\n')
@@ -531,10 +533,10 @@ ${naturalLanguagePlan}
           "order": 1,
           "time": "09:00" 或 "09:00-12:00",
           "type": "transport|activity|meal|rest|accommodation",
-          "title": "活动标题",
-          "location": "地点名称",
-          "address": "详细地址",
-          "description": "详细描述",
+          "title": "活动标题(可以是概括性的,如'外滩夜景漫步'、'午餐时光'、'前往酒店')",
+          "location": "活动发生的真实地点(必须是具体地点,或者从 POI标签 中提取真实名称)",
+          "address": "详细地址(尽可能完整,包括城市、区县、街道、门牌号)",
+          "description": "详细描述(说明在这个地点做什么)",
           "duration": 时长(分钟),
           "costEstimate": 费用,
           "rating": 评分,
@@ -615,6 +617,56 @@ ${naturalLanguagePlan}
 8. **行程天数**: durationDays和durationNights是核心字段,必须准确提取(如"3天2晚"中的3和2)
 9. **计算字段**: perPerson, percentage 等需要计算
 10. **提取原则**: 尽可能完整提取,但不要编造不存在的信息
+
+【⚠️ 地址信息提取特别要求 - 极其重要】
+
+**1. POI标签处理**:
+- Agent的回答中,工具返回的真实地点会用 [POI:地点名] 标记包裹
+- **提取时移除所有 [POI:...] 标记**,只保留地点名称本身
+- 例如: [POI:老盛昌汤包馆(南京东路店)] 提取为 老盛昌汤包馆(南京东路店)
+
+**2. 标题、地点、描述的区分** (最重要!):
+- **title字段**: 活动的概括性名称
+  ✅ 正确: "外滩夜景漫步"、"午餐时光"、"参观博物馆"、"前往酒店"
+  
+- **location字段**: 活动发生的具体真实地点(从 [POI:...] 标记中提取)
+  ✅ 正确: "上海外滩"、"老盛昌汤包馆(南京东路店)"、"上海博物馆"、"上海和平饭店"
+  ❌ 错误: "外滩夜景漫步"、"午餐"、"前往酒店"(这些是活动描述,不是地点!)
+  
+- **description字段**: 详细说明在该地点做什么
+  ✅ 正确: "在外滩观赏黄浦江夜景,欣赏万国建筑博览群的灯光秀"
+
+**3. 地点名称完整性**:
+- **location字段**: 必须包含城市名称,必须是真实地点
+  ✅ 正确: "上海外滩"、"北京故宫博物院"、"老盛昌汤包馆(南京东路店)"
+  ❌ 错误: "外滩"、"故宫"、"午餐"、"外滩夜景漫步"
+  
+- **address字段**: 尽可能完整,至少包含: 城市+区县+街道+门牌号
+  ✅ 正确: "上海市黄浦区南京东路XXX号"、"北京市东城区景山前街4号"
+  ❌ 错误: "南京东路XXX号"、"景山前街4号"
+
+**4. type分类说明**:
+- **transport**: 交通环节,用于串联各个活动点
+  - 例如: "从上海复旦大学前往上海外滩"
+  - location应为起点或终点的真实地点
+  
+- **activity**: 游览活动
+  - 例如: title="参观故宫", location="北京故宫博物院"
+  
+- **meal**: 用餐活动
+  - 例如: title="午餐", location="老盛昌汤包馆(南京东路店)"
+  
+- **accommodation**: 住宿
+  - 例如: title="入住酒店", location="上海和平饭店"
+  
+- **rest**: 休息/自由活动
+  - 例如: title="酒店休息", location="上海和平饭店"
+
+**5. 原因说明**:
+- 地址信息用于地图定位和路线规划
+- 不完整的地址会导致搜索到错误的城市
+- 例如: "外滩" 可能搜到湖北武汉的"外滩上海街道"而非上海外滩
+- title和location混淆会导致地图无法定位(如"午餐"不是地点)
 
 【输出格式】
 直接输出JSON,不要markdown代码块标记,不要任何解释文字。`

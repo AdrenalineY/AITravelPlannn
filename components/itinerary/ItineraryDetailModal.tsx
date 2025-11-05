@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   Modal,
   Tabs,
@@ -44,6 +44,7 @@ import {
 import type { ItineraryCard } from '@/types'
 import { ItineraryTimeline } from './ItineraryTimeline'
 import { HorizontalTimeline } from './HorizontalTimeline'
+import ItineraryMapView from '@/components/map/ItineraryMapView'
 
 const { Title, Text, Paragraph } = Typography
 const { TabPane } = Tabs
@@ -64,6 +65,18 @@ export function ItineraryDetailModal({
   onContinueChat,
 }: ItineraryDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview')
+  const [mapKey, setMapKey] = useState(0)
+
+  // 当切换到行程标签页时,重新渲染地图
+  React.useEffect(() => {
+    if (open && activeTab === 'itinerary') {
+      // 延迟重新渲染,确保 DOM 已准备好
+      const timer = setTimeout(() => {
+        setMapKey(prev => prev + 1)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [open, activeTab])
 
   if (!itinerary) return null
 
@@ -287,149 +300,40 @@ export function ItineraryDetailModal({
     </div>
   )
 
-  // 详细行程标签页 - 使用横向时间轴组件
+  // 详细行程标签页 - 上半部分地图,下半部分时间轴
   const renderItinerary = () => (
-    <div className="space-y-4">
-      <HorizontalTimeline itinerary={itinerary} />
-      {/* 保留原有代码作为备用 */}
-      {false && itinerary.days && itinerary.days.length > 0 ? (
-        itinerary.days.map((day, dayIdx) => (
-          <Card
-            key={dayIdx}
-            title={
-              <Space>
-                <Tag color="blue">第{day.dayNumber || dayIdx + 1}天</Tag>
-                <Text>{formatDate(day.date)}</Text>
-                {day.title && <Text type="secondary">· {day.title}</Text>}
-              </Space>
-            }
-            size="small"
-            extra={
-              day.totalDistance && (
-                <Text type="secondary" className="text-sm">
-                  总距离: {day.totalDistance}
-                </Text>
-              )
-            }
-          >
-            {day.summary && (
-              <Alert message={day.summary} type="info" showIcon className="mb-4" />
-            )}
+    <div style={{ height: 'calc(100vh - 300px)', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+      {/* 上半部分: 地图 (45% 高度) */}
+      <div style={{ height: '45%', marginBottom: 16, borderRadius: 8, overflow: 'hidden' }}>
+        {itinerary && itinerary.days && itinerary.days.length > 0 ? (
+          <ItineraryMapView
+            key={mapKey}
+            itineraryCard={itinerary}
+            showAllDays={true}
+            height="100%"
+          />
+        ) : (
+          <div style={{ 
+            height: '100%', 
+            background: '#f5f5f5', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: '#999',
+            borderRadius: 8
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <EnvironmentOutlined style={{ fontSize: 48, marginBottom: 8 }} />
+              <div>暂无地点坐标信息</div>
+            </div>
+          </div>
+        )}
+      </div>
 
-            <Timeline>
-              {day.segments?.map((segment, segIdx) => (
-                <Timeline.Item
-                  key={segIdx}
-                  dot={getSegmentIcon(segment.type)}
-                  color={segment.type === 'activity' ? 'green' : 'gray'}
-                >
-                  <div className="pb-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <Space className="mb-2">
-                          {segment.time && (
-                            <Tag icon={<ClockCircleOutlined />} color="default">
-                              {formatTime(segment.time)}
-                            </Tag>
-                          )}
-                          <Text strong className="text-base">{segment.title}</Text>
-                          {segment.rating && (
-                            <Space size={2}>
-                              <StarFilled className="text-yellow-500 text-xs" />
-                              <Text className="text-sm">{segment.rating}</Text>
-                            </Space>
-                          )}
-                        </Space>
-
-                        {segment.location && (
-                          <div className="text-gray-600 mb-2">
-                            <EnvironmentOutlined className="mr-1" />
-                            {segment.location}
-                            {segment.address && (
-                              <Text type="secondary" className="ml-2 text-xs">
-                                ({segment.address})
-                              </Text>
-                            )}
-                          </div>
-                        )}
-
-                        {segment.description && (
-                          <Paragraph className="text-gray-700 mb-2">
-                            {segment.description}
-                          </Paragraph>
-                        )}
-
-                        <Space size="middle" wrap>
-                          {segment.duration && (
-                            <Text type="secondary" className="text-sm">
-                              <ClockCircleOutlined className="mr-1" />
-                              {segment.duration}分钟
-                            </Text>
-                          )}
-                          {segment.costEstimate && (
-                            <Text type="secondary" className="text-sm">
-                              <DollarOutlined className="mr-1" />
-                              约¥{segment.costEstimate}
-                            </Text>
-                          )}
-                        </Space>
-
-                        {/* 距离信息 */}
-                        {segment.distanceInfo && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                            <CarOutlined className="mr-1" />
-                            <Text>
-                              {segment.distanceInfo.from} → {segment.distanceInfo.to}
-                            </Text>
-                            <Text type="secondary" className="ml-2">
-                              {segment.distanceInfo.mode === 'walk' && '步行'}
-                              {segment.distanceInfo.mode === 'subway' && '地铁'}
-                              {segment.distanceInfo.mode === 'bus' && '公交'}
-                              {segment.distanceInfo.mode === 'taxi' && '出租车'}
-                              {segment.distanceInfo.distance && ` · ${segment.distanceInfo.distance}`}
-                              {segment.distanceInfo.duration && ` · ${segment.distanceInfo.duration}`}
-                            </Text>
-                          </div>
-                        )}
-
-                        {/* 小贴士 */}
-                        {segment.tips && segment.tips.length > 0 && (
-                          <Alert
-                            message="小贴士"
-                            description={
-                              <ul className="pl-4 mb-0">
-                                {segment.tips.map((tip, tipIdx) => (
-                                  <li key={tipIdx}>{tip}</li>
-                                ))}
-                              </ul>
-                            }
-                            type="warning"
-                            showIcon
-                            className="mt-2"
-                          />
-                        )}
-
-                        {/* 预订信息 */}
-                        {segment.bookingInfo?.required && (
-                          <Alert
-                            message={`需要提前预订(${segment.bookingInfo.advanceTime || '建议提前'})`}
-                            type="info"
-                            showIcon
-                            icon={<CheckCircleOutlined />}
-                            className="mt-2"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Timeline.Item>
-              ))}
-            </Timeline>
-          </Card>
-        ))
-      ) : (
-        <Empty description="暂无详细行程" />
-      )}
+      {/* 下半部分: 时间轴 (55% 高度,可滚动) */}
+      <div style={{ height: '55%', overflow: 'auto', paddingRight: 8 }}>
+        <HorizontalTimeline itinerary={itinerary} />
+      </div>
     </div>
   )
 
