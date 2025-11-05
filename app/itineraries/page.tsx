@@ -109,8 +109,8 @@ export default function ItinerariesPage() {
             breakdown: [
               { category: 'transport', amount: 800, percentage: 17, notes: '高铁往返' },
               { category: 'accommodation', amount: 1600, percentage: 33, notes: '酒店2晚' },
-              { category: 'food', amount: 1200, percentage: 25, notes: '餐饮' },
-              { category: 'activity', amount: 1200, percentage: 25, notes: '门票等' },
+              { category: 'meal', amount: 1200, percentage: 25, notes: '餐饮' },
+              { category: 'ticket', amount: 1200, percentage: 25, notes: '门票等' },
             ],
           },
           days: [
@@ -155,8 +155,8 @@ export default function ItinerariesPage() {
             breakdown: [
               { category: 'transport', amount: 400, percentage: 22, notes: '交通' },
               { category: 'accommodation', amount: 600, percentage: 33, notes: '酒店1晚' },
-              { category: 'food', amount: 600, percentage: 33, notes: '餐饮' },
-              { category: 'activity', amount: 200, percentage: 11, notes: '门票' },
+              { category: 'meal', amount: 600, percentage: 33, notes: '餐饮' },
+              { category: 'ticket', amount: 200, percentage: 11, notes: '门票' },
             ],
           },
           days: [],
@@ -223,11 +223,11 @@ export default function ItinerariesPage() {
   }
 
   const handleEdit = (itinerary: ItineraryCardType) => {
-    // 跳转到行程编辑页面,带上行程 ID 和会话 ID
+    // 跳转到行程编辑页面,带上行程 ID 和会话分组 ID
     const params = new URLSearchParams()
     params.set('id', itinerary.id)
-    if (itinerary.sessionId) {
-      params.set('sessionId', itinerary.sessionId)
+    if (itinerary.sessionGroupId) {
+      params.set('sessionGroupId', itinerary.sessionGroupId)
     }
     router.push(`/itinerary/edit?${params.toString()}`)
   }
@@ -271,11 +271,11 @@ export default function ItinerariesPage() {
   }
 
   const handleContinueChat = () => {
-    if (selectedItinerary?.sessionId) {
+    if (selectedItinerary?.sessionGroupId) {
       // 跳转到行程编辑页面并加载历史对话
       const params = new URLSearchParams()
       params.set('id', selectedItinerary.id)
-      params.set('sessionId', selectedItinerary.sessionId)
+      params.set('sessionGroupId', selectedItinerary.sessionGroupId)
       router.push(`/itinerary/edit?${params.toString()}`)
     } else {
       message.warning('无法继续对话,会话信息丢失')

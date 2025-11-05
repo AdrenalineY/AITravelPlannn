@@ -5,18 +5,20 @@
 import type { ConversationSession, AgentMessage, ItineraryCard } from '@/types'
 
 interface AgentRunRequest {
-  sessionId?: string
+  sessionGroupId?: string  // 🔄 重构: sessionId → sessionGroupId
+  sessionTitle?: string    // 🔄 新增: 会话标题
+  targetDestination?: string  // 🔄 新增: 目标目的地
   message: string
   maxTurns?: number
 }
 
 interface AgentRunResponse {
   success: boolean
-  sessionId: string
+  sessionGroupId: string  // 🔄 重构: sessionId → sessionGroupId
   agentRunId: string
   finalAnswer?: string
   planExtracted?: ItineraryCard
-  itineraryId?: string
+  itineraryCardId?: string  // 🔄 重构: itineraryId → itineraryCardId
   messages: AgentMessage[]
   error?: string
 }
@@ -24,7 +26,9 @@ interface AgentRunResponse {
 interface AgentRunStatusResponse {
   agentRun: {
     id: string
-    sessionId: string
+    sessionGroupId: string  // 🔄 重构: sessionId → sessionGroupId
+    sessionTitle?: string   // 🔄 新增
+    targetDestination?: string  // 🔄 新增
     userMessage: string
     finalAnswer?: string
     planExtracted?: ItineraryCard

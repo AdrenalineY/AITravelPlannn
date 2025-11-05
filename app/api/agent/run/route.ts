@@ -1,5 +1,11 @@
 /**
- * Agent Run API - 处理前端 Agent 运行请求
+ * Agent Run API (重构版) - 处理前端 Agent 运行请求
+ * 
+ * 主要变更:
+ * 1. 移除 conversation_sessions 表依赖
+ * 2. 使用 session_group_id 作为会话标识
+ * 3. 使用 itinerary_cards 表保存行程(完整JSON存储)
+ * 4. 从 profiles.travel_preferences 读取用户偏好
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -7,6 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { reactAgentService } from '@/services/reactAgent'
 import { aiService } from '@/services/aiService'
 import { mapService } from '@/services/mapService'
+import { saveItineraryCard } from '@/services/itineraryCardService'
 import AgentConfig from '@/config/agent.config'
 
 export async function POST(request: NextRequest) {
@@ -25,120 +32,23 @@ export async function POST(request: NextRequest) {
 
     // 解析请求体
     const body = await request.json()
-    const { sessionId, message, maxTurns = AgentConfig.MAX_TURNS } = body
+    const { 
+      sessionGroupId,  // 新: 使用 session_group_id
+      sessionTitle,    // 新: 会话标题
+      targetDestination, // 新: 目标目的地
+      message, 
+      maxTurns = AgentConfig.MAX_TURNS 
+    } = body
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: '缺少消息内容' }, { status: 400 })
     }
 
-    // 获取或创建会话
-    let session
-    if (sessionId) {
-      const { data, error } = await supabase
-        .from('conversation_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('user_id', user.id)
-        .single()
-
-      if (error || !data) {
-        // 会话不存在，创建新会话（而不是报错）
-        const { data: newSession, error: createError } = await supabase
-          .from('conversation_sessions')
-          .insert({
-            user_id: user.id,
-            title: message.substring(0, 50),
-            user_preferences: {},
-            is_active: true,
-          })
-          .select()
-          .single()
-
-        if (createError) {
-          console.error('[Agent API] 创建会话失败:', {
-            code: createError.code,
-            message: createError.message,
-            details: createError.details,
-            hint: createError.hint,
-          })
-          
-          // 检查是否是表不存在的错误
-          if (createError.code === '42P01' || createError.message?.includes('relation') || createError.message?.includes('does not exist')) {
-            return NextResponse.json({ 
-              error: '数据库表未初始化',
-              message: '请先在 Supabase Dashboard 中执行 Agent 数据库迁移脚本（04_agent_tables.sql）',
-              details: createError.message,
-              migrationRequired: true
-            }, { status: 500 })
-          }
-          
-          return NextResponse.json({ 
-            error: '创建会话失败',
-            details: createError.message,
-            code: createError.code
-          }, { status: 500 })
-        }
-        
-        if (!newSession) {
-          return NextResponse.json({ 
-            error: '创建会话失败',
-            details: '未返回会话数据'
-          }, { status: 500 })
-        }
-        
-        session = newSession
-      } else {
-        session = data
-      }
-    } else {
-      // 创建新会话
-      const { data, error } = await supabase
-        .from('conversation_sessions')
-        .insert({
-          user_id: user.id,
-          title: message.substring(0, 50),
-          user_preferences: {},
-          is_active: true,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('[Agent API] 创建会话失败:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        })
-        
-        // 检查是否是表不存在的错误
-        if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-          return NextResponse.json({ 
-            error: '数据库表未初始化',
-            message: '请先在 Supabase Dashboard 中执行 Agent 数据库迁移脚本（04_agent_tables.sql）',
-            details: error.message,
-            migrationRequired: true
-          }, { status: 500 })
-        }
-        
-        return NextResponse.json({ 
-          error: '创建会话失败',
-          details: error.message,
-          code: error.code
-        }, { status: 500 })
-      }
-      
-      if (!data) {
-        return NextResponse.json({ 
-          error: '创建会话失败',
-          details: '未返回会话数据' 
-        }, { status: 500 })
-      }
-      
-      session = data
+    if (!sessionGroupId || typeof sessionGroupId !== 'string') {
+      return NextResponse.json({ error: '缺少 sessionGroupId' }, { status: 400 })
     }
 
-    // 加载用户的 API 配置 (使用后端 Supabase 客户端)
+    // 加载用户的 API 配置
     const { ConfigService } = await import('@/services/configService')
     const backendConfigService = new ConfigService(supabase)
     const config = await backendConfigService.loadConfig(user.id)
@@ -188,8 +98,13 @@ export async function POST(request: NextRequest) {
       mapService.setWebServiceKey(config.map.webServiceKey)
     }
 
-    // 创建并运行 Agent（传入后端 Supabase 客户端）
-    const agent = await reactAgentService.createAgent(session.id, user.id, supabase)
+    // 创建并运行 Agent (新签名: sessionGroupId, userId, supabase)
+    const agent = await reactAgentService.createAgent(
+      sessionGroupId, 
+      user.id, 
+      supabase
+    )
+    
     const result = await agent.run(message, maxTurns)
 
     if (!result.success) {
@@ -203,210 +118,59 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 如果提取到了行程计划,保存完整数据到 itineraries 表
-    let itineraryId = session.itinerary_id
+    // 如果提取到了行程计划,保存到 itinerary_cards 表
+    let itineraryCardId: string | null = null
     
     console.log('[Agent API] 检查行程保存条件:', {
       hasPlanExtracted: !!result.planExtracted,
-      sessionItineraryId: session.itinerary_id,
-      willSave: !!(result.planExtracted && !session.itinerary_id)
+      sessionGroupId,
+      willSave: !!result.planExtracted
     })
     
-    if (result.planExtracted && !session.itinerary_id) {
-      console.log('[Agent API] 开始保存行程到数据库...')
+    if (result.planExtracted) {
+      console.log('[Agent API] 开始保存行程到 itinerary_cards...')
       
-      // �️ 双重检查: 确认该 session 还没有关联的行程 (防止并发请求)
-      const { data: existingItinerary } = await supabase
-        .from('itineraries')
+      // 双重检查: 确认该 session_group_id 还没有关联的行程卡片
+      const { data: existingCard } = await supabase
+        .from('itinerary_cards')
         .select('id')
-        .eq('session_id', session.id)
+        .eq('session_group_id', sessionGroupId)
+        .eq('user_id', user.id)
         .limit(1)
         .maybeSingle()
       
-      if (existingItinerary) {
-        console.log('[Agent API] ⚠️ 该会话已有关联行程,跳过保存:', existingItinerary.id)
-        itineraryId = existingItinerary.id
+      if (existingCard) {
+        console.log('[Agent API] ⚠️ 该会话已有关联行程卡片,跳过保存:', existingCard.id)
+        itineraryCardId = existingCard.id
       } else {
         console.log('[Agent API] 确认无重复,继续保存...')
-      
-        // �🔧 修复: 使用完整的 planExtracted 数据,包括 days
-        const planData = {
-          ...result.planExtracted,
-          userId: user.id, // 确保 userId 设置正确
-        }
-      
-      // 转换为 API 格式 (camelCase)
-      const apiPayload = {
-        sessionId: session.id,
-        userId: user.id,
-        title: planData.title || '旅行计划',
-        destination: planData.destination,
-        cities: planData.cities || [],
-        startDate: planData.startDate,
-        endDate: planData.endDate,
-        durationDays: planData.durationDays || planData.totalDays || (planData.days?.length),  // 新增
-        durationNights: planData.durationNights || planData.totalNights || (planData.days?.length ? planData.days.length - 1 : null),  // 新增
-        travelers: planData.travelers || 1,
-        travelersDetail: planData.travelersDetail || {},
-        preferences: planData.preferences || [],
-        travelStyle: planData.travelStyle,
-        specialRequests: planData.specialRequests || [],
-        theme: planData.theme,
-        totalBudget: planData.totalBudget || 0,
-        budgetPerPerson: planData.budgetPerPerson,
-        currency: planData.currency || 'CNY',
-        estimatedCost: planData.estimatedCost || {},
-        accommodation: planData.accommodation || {},
-        days: planData.days || [], // ✅ 包含完整的 days 数据
-        tips: planData.tips || {},
-        foodRecommendations: planData.foodRecommendations || [],
-        shoppingSpots: planData.shoppingSpots || [],
-        transportationSummary: planData.transportationSummary || {},
-        fullPlan: planData.fullPlan || result.finalAnswer,
-        rawPlan: planData.rawPlan || '',
-        planDescription: result.finalAnswer,  // 新增: 保存 Agent 最后输出的完整描述
-        status: 'draft',
-        tags: planData.tags || [],
-        isPublic: false,
-        version: 1,
-      }
-      
-      // 调用 itinerary-cards API 来保存完整数据 (包括 days 和 activities)
-      const { data: newItinerary, error: itineraryError } = await supabase
-        .from('itineraries')
-        .insert({
-          session_id: session.id,
-          user_id: user.id,
-          title: apiPayload.title,
-          destination: apiPayload.destination,
-          cities: apiPayload.cities,
-          start_date: apiPayload.startDate,
-          end_date: apiPayload.endDate,
-          travelers: apiPayload.travelers,
-          travelers_detail: apiPayload.travelersDetail,
-          preferences: apiPayload.preferences,
-          travel_style: apiPayload.travelStyle,
-          special_requests: apiPayload.specialRequests,
-          theme: apiPayload.theme,
-          budget: apiPayload.totalBudget,
-          budget_per_person: apiPayload.budgetPerPerson,
-          currency: apiPayload.currency,
-          estimated_cost: apiPayload.estimatedCost,
-          accommodation: apiPayload.accommodation,
-          tips: apiPayload.tips,
-          food_recommendations: apiPayload.foodRecommendations,
-          shopping_spots: apiPayload.shoppingSpots,
-          transportation_summary: apiPayload.transportationSummary,
-          notes: apiPayload.fullPlan,
-          status: 'draft',
-          tags: apiPayload.tags,
-          is_public: false,
-          version: 1,
-        })
-        .select()
-        .single()
-
-      if (!itineraryError && newItinerary) {
-        itineraryId = newItinerary.id
-        console.log('[Agent API] ✅ 行程主表保存成功:', itineraryId)
         
-        // 🔧 立即更新会话关联，防止并发请求重复保存
-        await supabase
-          .from('conversation_sessions')
-          .update({ itinerary_id: newItinerary.id })
-          .eq('id', session.id)
-        console.log('[Agent API] ✅ 会话已关联行程ID')
-
-        // 保存 days 和 activities
-        if (apiPayload.days && apiPayload.days.length > 0) {
-          for (let dayIndex = 0; dayIndex < apiPayload.days.length; dayIndex++) {
-            const day = apiPayload.days[dayIndex]
-            
-            // 计算日期
-            let dayDate = day.date
-            if (!dayDate && apiPayload.startDate) {
-              const startDate = new Date(apiPayload.startDate)
-              startDate.setDate(startDate.getDate() + dayIndex)
-              dayDate = startDate.toISOString().split('T')[0]
-            }
-            if (!dayDate) {
-              const today = new Date()
-              today.setDate(today.getDate() + dayIndex)
-              dayDate = today.toISOString().split('T')[0]
-            }
-            
-            const { data: dayRecord, error: dayError } = await supabase
-              .from('itinerary_days')
-              .insert({
-                itinerary_id: newItinerary.id,
-                day_number: day.dayNumber || dayIndex + 1,
-                date: dayDate,
-                title: day.title || `第${dayIndex + 1}天`,
-                summary: day.summary,
-                highlights: day.highlights || [],
-                total_distance: day.totalDistance,
-                total_duration: day.totalDuration,
-                total_cost: day.segments?.reduce((sum: number, seg: any) => sum + (seg.costEstimate || 0), 0) || 0,
-              })
-              .select()
-              .single()
-
-            if (dayError) {
-              console.error('[Agent API] ❌ 保存第', dayIndex + 1, '天失败:', dayError)
-              continue
-            }
-            console.log('[Agent API] ✅ 保存第', dayIndex + 1, '天成功')
-
-            // 保存 activities
-            if (day.segments && day.segments.length > 0) {
-              const activities = day.segments.map((segment: any, segIndex: number) => ({
-                day_id: dayRecord.id,
-                order: segment.order || segIndex + 1,
-                time: segment.time,
-                activity_type: segment.type,
-                poi_id: segment.poiId,
-                poi_name: segment.title,
-                location_lng: segment.coordinates?.lng,
-                location_lat: segment.coordinates?.lat,
-                address: segment.address,
-                category: segment.category,
-                description: segment.description,
-                notes: segment.notes,
-                cost: segment.costEstimate,
-                duration: segment.duration,
-                rating: segment.rating,
-                tips: segment.tips || [],
-                distance_info: segment.distanceInfo || {},
-                booking_info: segment.bookingInfo || {},
-              }))
-
-              const { error: activitiesError } = await supabase
-                .from('itinerary_activities')
-                .insert(activities)
-
-              if (activitiesError) {
-                console.error('[Agent API] ❌ 保存活动失败:', activitiesError)
-              } else {
-                console.log('[Agent API] ✅ 保存', activities.length, '个活动成功')
-              }
-            }
-          }
-        }
-        
-        console.log('[Agent API] ✅ 行程完整数据保存完成')
-        } else {
-          console.error('[Agent API] ❌ 保存行程失败:', itineraryError)
+        try {
+          // 使用新的 itineraryCardService 保存完整JSON
+          const savedCard = await saveItineraryCard(
+            supabase,
+            user.id,
+            sessionGroupId,
+            result.planExtracted // 直接传入完整的 ItineraryCard 对象
+          )
+          
+          itineraryCardId = savedCard.id
+          console.log('[Agent API] ✅ 行程卡片保存成功:', itineraryCardId)
+          
+        } catch (saveError: any) {
+          console.error('[Agent API] ❌ 保存行程卡片失败:', saveError)
+          // 不阻断主流程,仅记录错误
         }
       }
     }
 
     return NextResponse.json({
       success: true,
-      sessionId: session.id,
+      sessionGroupId,
       agentRunId: result.agentRunId,
       finalAnswer: result.finalAnswer,
       planExtracted: result.planExtracted,
-      itineraryId,
+      itineraryCardId,  // 新: 返回行程卡片ID
       messages: result.messages,
     })
   } catch (error: any) {
@@ -442,20 +206,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '缺少 agentRunId' }, { status: 400 })
     }
 
-    // 查询 agent_run 记录
+    // 查询 agent_run 记录 (新: 不再join conversation_sessions)
     const { data: agentRun, error: runError } = await supabase
       .from('agent_runs')
-      .select('*, conversation_sessions!inner(user_id)')
+      .select('*')
       .eq('id', agentRunId)
+      .eq('user_id', user.id)  // 新: 直接验证 user_id
       .single()
 
     if (runError || !agentRun) {
       return NextResponse.json({ error: 'Agent 运行记录不存在' }, { status: 404 })
-    }
-
-    // 验证权限
-    if (agentRun.conversation_sessions.user_id !== user.id) {
-      return NextResponse.json({ error: '无权访问' }, { status: 403 })
     }
 
     // 获取消息记录
@@ -475,14 +235,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       agentRun: {
         id: agentRun.id,
-        sessionId: agentRun.session_id,
+        sessionGroupId: agentRun.session_group_id,  // 新: 返回 session_group_id
+        sessionTitle: agentRun.session_title,        // 新
+        targetDestination: agentRun.target_destination, // 新
         userMessage: agentRun.user_message,
         finalAnswer: agentRun.final_answer,
         planExtracted: agentRun.plan_extracted,
         status: agentRun.status,
         errorMessage: agentRun.error_message,
         turnCount: agentRun.turn_count,
-        createdAt: agentRun.created_at,
+        createdAt: agentRun.created_time,  // 新: 使用 created_time
         completedAt: agentRun.completed_at,
       },
       messages: messages || [],

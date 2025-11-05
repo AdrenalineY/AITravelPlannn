@@ -16,14 +16,14 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  sessionId: string | null
+  sessionGroupId: string | null  // 🔄 重构: sessionId → sessionGroupId
   onItineraryUpdate?: (itinerary: Partial<ItineraryCard>) => void
-  onSessionCreated?: (sessionId: string) => void
+  onSessionCreated?: (sessionGroupId: string) => void  // 🔄 重构
   height?: string | number
 }
 
 export function ChatInterface({
-  sessionId,
+  sessionGroupId,  // 🔄 重构
   onItineraryUpdate,
   onSessionCreated,
   height = '100%',
@@ -31,14 +31,14 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const currentSessionId = useRef<string | null>(sessionId)
+  const currentSessionGroupId = useRef<string | null>(sessionGroupId)  // 🔄 重构
 
   // 加载历史消息
   useEffect(() => {
-    if (sessionId) {
-      loadHistoryMessages(sessionId)
+    if (sessionGroupId) {
+      loadHistoryMessages(sessionGroupId)
     }
-  }, [sessionId])
+  }, [sessionGroupId])
 
   const loadHistoryMessages = async (sid: string) => {
     try {
@@ -69,14 +69,14 @@ export function ChatInterface({
       // 调用 Agent API
       const result = await agentServiceClient.runAgent({
         message: content,
-        sessionId: currentSessionId.current || undefined,
+        sessionGroupId: currentSessionGroupId.current || undefined,  // 🔄 重构
         maxTurns: 10,
       })
 
-      // 更新会话 ID
-      if (result.sessionId && !currentSessionId.current) {
-        currentSessionId.current = result.sessionId
-        onSessionCreated?.(result.sessionId)
+      // 更新会话分组 ID
+      if (result.sessionGroupId && !currentSessionGroupId.current) {
+        currentSessionGroupId.current = result.sessionGroupId
+        onSessionCreated?.(result.sessionGroupId)
       }
 
       // 添加 Agent 思考过程消息

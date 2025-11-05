@@ -43,13 +43,13 @@ export default function ItineraryEditPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const itineraryId = searchParams.get('id')
-  const sessionId = searchParams.get('sessionId')
+  const sessionGroupId = searchParams.get('sessionGroupId')  // 🔄 重构: sessionId → sessionGroupId
   const { user, reset: resetAuth } = useAuthStore()
 
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [itinerary, setItinerary] = useState<ItineraryCard | null>(null)
-  const [conversationSessionId, setConversationSessionId] = useState<string | null>(sessionId)
+  const [conversationSessionGroupId, setConversationSessionGroupId] = useState<string | null>(sessionGroupId)  // 🔄 重构
   const [mapMarkers, setMapMarkers] = useState<MapMarker[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [userInput, setUserInput] = useState('')
@@ -218,13 +218,13 @@ export default function ItineraryEditPage() {
       // 调用 Agent API
       const result = await agentServiceClient.runAgent({
         message: userMessage,
-        sessionId: conversationSessionId || undefined,
+        sessionGroupId: conversationSessionGroupId || undefined,  // 🔄 重构: sessionId → sessionGroupId
         maxTurns: 10,
       })
 
-      // 更新会话 ID
-      if (result.sessionId && !conversationSessionId) {
-        setConversationSessionId(result.sessionId)
+      // 更新会话分组 ID
+      if (result.sessionGroupId && !conversationSessionGroupId) {
+        setConversationSessionGroupId(result.sessionGroupId)
       }
 
       // 添加 AI 回复

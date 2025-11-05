@@ -266,9 +266,11 @@ export interface ConversationSession {
 
 export interface AgentRun {
   id: string
-  sessionId: string
+  sessionGroupId: string  // 🔄 重构: 使用 session_group_id
+  sessionTitle?: string   // 🔄 新增: 会话标题
+  targetDestination?: string  // 🔄 新增: 目标目的地
   userMessage: string
-  context: {
+  contextData: {  // 🔄 重构: context → contextData
     conversationHistory: Array<{ role: string; content: string }>
     userPreferences: Record<string, any>
     currentPlan?: any
@@ -382,7 +384,7 @@ export interface CostEstimateOutput {
 export interface ItineraryCard {
   // 基本信息
   id: string
-  sessionId?: string  // 关联的会话ID
+  sessionGroupId?: string  // 🔄 重构: 关联的会话分组ID (替代 sessionId)
   userId?: string     // 用户ID
   title: string       // 行程标题
   destination: string // 主要目的地

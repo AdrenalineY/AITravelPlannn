@@ -332,6 +332,32 @@ Answer:
   }
 
   /**
+   * 从用户消息中提取目标目的地
+   * 简单实现:查找常见的目的地关键词
+   */
+  private extractDestinationFromMessage(message: string): string | null {
+    // 匹配 "去XXX"、"到XXX"、"XXX旅游"、"XXX几日游" 等模式
+    const patterns = [
+      /去\s*([^\s，,。.？?！!]+)/,
+      /到\s*([^\s，,。.？?！!]+)/,
+      /([^\s，,。.？?！!]+)\s*旅游/,
+      /([^\s，,。.？?！!]+)\s*[0-9一二三四五六七八九十]+日游/,
+      /([^\s，,。.？?！!]+)\s*[0-9一二三四五六七八九十]+天/,
+      /游览\s*([^\s，,。.？?！!]+)/,
+      /参观\s*([^\s，,。.？?！!]+)/
+    ]
+    
+    for (const pattern of patterns) {
+      const match = message.match(pattern)
+      if (match && match[1]) {
+        return match[1]
+      }
+    }
+    
+    return null
+  }
+
+  /**
    * 运行完整的 ReAct 循环
    * 对应 Python 版本的 __call__ 方法
    */
@@ -346,13 +372,20 @@ Answer:
     const agentMessages: AgentMessage[] = []
 
     try {
-      // 创建 agent_run 记录
+      // 🔄 重构: 创建 agent_run 记录（包含会话管理字段）
+      // 从用户消息中提取标题和目的地作为元数据
+      const sessionTitle = userMessage.substring(0, 100)
+      const targetDestination = this.extractDestinationFromMessage(userMessage)
+      
       const { data: agentRun, error: runError } = await this.supabase
         .from('agent_runs')
         .insert({
-          session_id: this.context.sessionId,
+          user_id: this.context.userId,
+          session_group_id: this.context.sessionId, // 使用 session_group_id
+          session_title: sessionTitle,
+          target_destination: targetDestination,
           user_message: userMessage,
-          context: {
+          context_data: {
             conversationHistory: this.context.conversationHistory,
             userPreferences: this.context.userPreferences,
             currentPlan: this.context.currentPlan
@@ -848,40 +881,38 @@ ${planFormatted}
 
 /**
  * 创建 Agent 实例的工厂函数
+ * @param sessionGroupId - 会话分组ID（同一次旅行规划的多个agent_run共享）
+ * @param userId - 用户ID
+ * @param supabaseClient - 可选的 Supabase 客户端（用于后端）
  */
 export async function createReactAgent(
-  sessionId: string,
+  sessionGroupId: string,
   userId: string,
   supabaseClient?: any // 可选的 Supabase 客户端（用于后端）
 ): Promise<ReactAgent> {
   const supabase = supabaseClient || createClient()
 
-  console.log('[ReactAgent] 创建 Agent, sessionId:', sessionId, 'userId:', userId)
+  console.log('[ReactAgent] 创建 Agent, sessionGroupId:', sessionGroupId, 'userId:', userId)
 
-  // 获取会话信息
-  const { data: session, error: sessionError } = await supabase
-    .from('conversation_sessions')
-    .select('*')
-    .eq('id', sessionId)
+  // 🔄 重构: 从 profiles 表获取用户旅行偏好（统一管理）
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('travel_preferences')
+    .eq('id', userId)
     .single()
 
-  if (sessionError) {
-    console.error('[ReactAgent] 查询会话失败:', sessionError)
-    throw new Error(`会话查询失败: ${sessionError.message}`)
+  if (profileError) {
+    console.warn('[ReactAgent] 查询用户偏好失败:', profileError)
   }
 
-  if (!session) {
-    console.error('[ReactAgent] 会话不存在, sessionId:', sessionId)
-    throw new Error('会话不存在')
-  }
+  console.log('[ReactAgent] 用户偏好加载:', profile?.travel_preferences ? '成功' : '使用默认')
 
-  console.log('[ReactAgent] 会话查询成功:', session.id)
-
-  // 获取对话历史(从 agent_runs 和 agent_messages 重建)
+  // 🔄 重构: 从 agent_runs 获取对话历史（按 session_group_id 分组）
   const { data: previousRuns } = await supabase
     .from('agent_runs')
     .select('user_message, final_answer')
-    .eq('session_id', sessionId)
+    .eq('session_group_id', sessionGroupId)
+    .eq('user_id', userId)
     .eq('status', 'completed')
     .order('created_at', { ascending: true })
 
@@ -901,25 +932,24 @@ export async function createReactAgent(
     })
   }
 
-  // 获取当前计划
+  // 🔄 重构: 从 itinerary_cards 获取当前计划（通过 session_group_id）
   let currentPlan: ItineraryCard | undefined
-  if (session.itinerary_id) {
-    const { data: itinerary } = await supabase
-      .from('itineraries')
-      .select('*')
-      .eq('id', session.itinerary_id)
-      .single()
+  const { data: itineraryCard } = await supabase
+    .from('itinerary_cards')
+    .select('plan_data')
+    .eq('session_group_id', sessionGroupId)
+    .eq('user_id', userId)
+    .single()
 
-    if (itinerary) {
-      currentPlan = itinerary as any // 需要转换
-    }
+  if (itineraryCard?.plan_data) {
+    currentPlan = itineraryCard.plan_data as ItineraryCard
   }
 
   const context: AgentContext = {
-    sessionId,
+    sessionId: sessionGroupId, // 🔄 使用 session_group_id
     userId,
     conversationHistory,
-    userPreferences: session.user_preferences || {},
+    userPreferences: profile?.travel_preferences || {}, // 🔄 从 profiles 获取
     currentPlan
   }
 

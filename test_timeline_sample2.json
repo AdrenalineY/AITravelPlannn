@@ -1,0 +1,845 @@
+{
+  "id": "test-itinerary-001",
+  "sessionGroupId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "user-123",
+  "title": "北京文化深度游",
+  "destination": "北京",
+  "cities": ["北京"],
+  "startDate": "2025-11-15",
+  "endDate": "2025-11-17",
+  "totalDays": 3,
+  "totalNights": 2,
+  "durationDays": 3,
+  "durationNights": 2,
+  "travelers": 2,
+  "travelersDetail": {
+    "adults": 2,
+    "children": 0,
+    "seniors": 0
+  },
+  "preferences": ["文化历史", "美食体验", "摄影"],
+  "travelStyle": "深度游",
+  "specialRequests": ["需要无障碍设施", "素食餐厅"],
+  "theme": "历史文化",
+  "totalBudget": 5000,
+  "budgetPerPerson": 2500,
+  "currency": "CNY",
+  "estimatedCost": {
+    "total": 5000,
+    "perPerson": 2500,
+    "breakdown": [
+      {
+        "category": "accommodation",
+        "item": "住宿",
+        "amount": 1200,
+        "percentage": 24,
+        "notes": "经济型酒店 2晚"
+      },
+      {
+        "category": "meal",
+        "item": "餐饮",
+        "amount": 1500,
+        "percentage": 30,
+        "notes": "含特色餐厅"
+      },
+      {
+        "category": "transport",
+        "item": "交通",
+        "amount": 800,
+        "percentage": 16,
+        "notes": "市内交通+高铁"
+      },
+      {
+        "category": "ticket",
+        "item": "门票",
+        "amount": 1000,
+        "percentage": 20,
+        "notes": "景点门票"
+      },
+      {
+        "category": "shopping",
+        "item": "购物",
+        "amount": 500,
+        "percentage": 10,
+        "notes": "纪念品预算"
+      }
+    ]
+  },
+  "accommodation": {
+    "type": "hotel",
+    "name": "北京王府井如家酒店",
+    "address": "北京市东城区王府井大街138号",
+    "checkIn": "2025-11-15",
+    "checkOut": "2025-11-17",
+    "nights": 2,
+    "roomType": "标准双人间",
+    "pricePerNight": 600,
+    "totalPrice": 1200,
+    "amenities": ["WiFi", "空调", "电视", "热水"],
+    "rating": 4.5,
+    "bookingInfo": {
+      "platform": "携程",
+      "confirmationRequired": true
+    }
+  },
+  "days": [
+    {
+      "dayNumber": 1,
+      "date": "2025-11-15",
+      "title": "抵达北京 · 天安门故宫",
+      "summary": "上午抵达北京，参观天安门广场和故宫博物院，下午游览景山公园俯瞰紫禁城全景",
+      "highlights": ["天安门广场", "故宫博物院", "景山公园"],
+      "totalDistance": 5.2,
+      "totalDuration": 480,
+      "totalCost": 350,
+      "segments": [
+        {
+          "order": 1,
+          "type": "transport",
+          "time": "08:00",
+          "title": "高铁抵达北京",
+          "location": "北京南站",
+          "address": "北京市丰台区永外大街车站路12号",
+          "coordinates": {
+            "lng": 116.378631,
+            "lat": 39.865195
+          },
+          "duration": 300,
+          "description": "从出发地乘坐高铁抵达北京南站",
+          "transportation": {
+            "mode": "train",
+            "details": "高铁G101次",
+            "ticketPrice": 550
+          },
+          "costEstimate": 550,
+          "notes": "提前30分钟到站取票",
+          "tips": ["建议购买商务座更舒适", "车站有行李寄存服务"]
+        },
+        {
+          "order": 2,
+          "type": "transport",
+          "time": "13:00",
+          "title": "前往酒店办理入住",
+          "location": "北京王府井如家酒店",
+          "address": "北京市东城区王府井大街138号",
+          "coordinates": {
+            "lng": 116.410781,
+            "lat": 39.914492
+          },
+          "duration": 45,
+          "description": "从北京南站乘坐地铁4号线到王府井",
+          "transportation": {
+            "mode": "subway",
+            "details": "地铁4号线 → 1号线",
+            "ticketPrice": 4
+          },
+          "distanceInfo": {
+            "distance": 12.5,
+            "duration": 45,
+            "mode": "subway"
+          },
+          "costEstimate": 4
+        },
+        {
+          "order": 3,
+          "type": "transport",
+          "time": "14:00",
+          "title": "前往天安门广场",
+          "location": "天安门广场",
+          "address": "北京市东城区天安门广场",
+          "coordinates": {
+            "lng": 116.397428,
+            "lat": 39.903738
+          },
+          "duration": 15,
+          "description": "从酒店步行至天安门广场",
+          "transportation": {
+            "mode": "walk",
+            "details": "步行约1公里"
+          },
+          "distanceInfo": {
+            "distance": 1.0,
+            "duration": 15,
+            "mode": "walk"
+          },
+          "costEstimate": 0
+        },
+        {
+          "order": 4,
+          "type": "activity",
+          "time": "14:15",
+          "title": "天安门广场游览",
+          "location": "天安门广场",
+          "address": "北京市东城区天安门广场",
+          "coordinates": {
+            "lng": 116.397428,
+            "lat": 39.903738
+          },
+          "category": "景点",
+          "poiId": "B000A8VQMB",
+          "duration": 60,
+          "description": "参观世界最大的城市广场，观赏天安门城楼、人民英雄纪念碑",
+          "costEstimate": 0,
+          "rating": 4.8,
+          "tips": ["需要安检，不能携带打火机等物品", "最佳拍照时间为下午3-4点", "广场周边有公共卫生间"],
+          "bookingInfo": {
+            "requiresReservation": false,
+            "advanceBookingDays": 0
+          }
+        },
+        {
+          "order": 5,
+          "type": "transport",
+          "time": "15:15",
+          "title": "步行前往故宫",
+          "location": "故宫博物院",
+          "address": "北京市东城区景山前街4号",
+          "coordinates": {
+            "lng": 116.397026,
+            "lat": 39.916668
+          },
+          "duration": 5,
+          "description": "从天安门广场北侧进入故宫午门",
+          "transportation": {
+            "mode": "walk",
+            "details": "步行约400米"
+          },
+          "distanceInfo": {
+            "distance": 0.4,
+            "duration": 5,
+            "mode": "walk"
+          },
+          "costEstimate": 0
+        },
+        {
+          "order": 6,
+          "type": "activity",
+          "time": "15:20",
+          "title": "故宫博物院深度游",
+          "location": "故宫博物院",
+          "address": "北京市东城区景山前街4号",
+          "coordinates": {
+            "lng": 116.397026,
+            "lat": 39.916668
+          },
+          "category": "景点",
+          "poiId": "B000A8VPN2",
+          "duration": 180,
+          "description": "参观太和殿、中和殿、保和殿、乾清宫、坤宁宫、御花园等主要建筑，感受明清皇家建筑的恢弘气势",
+          "costEstimate": 60,
+          "rating": 4.9,
+          "tips": [
+            "必须提前在官网预约，当天不售票",
+            "推荐路线：午门→太和殿→乾清宫→御花园→神武门",
+            "建议租借讲解器或请导游",
+            "16:00后停止入场"
+          ],
+          "bookingInfo": {
+            "requiresReservation": true,
+            "advanceBookingDays": 10,
+            "bookingUrl": "https://www.dpm.org.cn",
+            "ticketPrice": 60
+          }
+        },
+        {
+          "order": 7,
+          "type": "transport",
+          "time": "18:20",
+          "title": "前往景山公园",
+          "location": "景山公园",
+          "address": "北京市西城区景山西街44号",
+          "coordinates": {
+            "lng": 116.395759,
+            "lat": 39.928346
+          },
+          "duration": 5,
+          "description": "从故宫神武门出来即到景山公园南门",
+          "transportation": {
+            "mode": "walk",
+            "details": "步行约300米"
+          },
+          "distanceInfo": {
+            "distance": 0.3,
+            "duration": 5,
+            "mode": "walk"
+          },
+          "costEstimate": 0
+        },
+        {
+          "order": 8,
+          "type": "activity",
+          "time": "18:25",
+          "title": "景山公园看日落",
+          "location": "景山公园",
+          "address": "北京市西城区景山西街44号",
+          "coordinates": {
+            "lng": 116.395759,
+            "lat": 39.928346
+          },
+          "category": "景点",
+          "poiId": "B000A8VQN5",
+          "duration": 45,
+          "description": "登上景山万春亭，俯瞰故宫全景，欣赏北京中轴线日落美景",
+          "costEstimate": 2,
+          "rating": 4.7,
+          "tips": ["最佳观景时间为傍晚日落前", "带好相机和广角镜头", "注意安全，台阶较陡"],
+          "bookingInfo": {
+            "requiresReservation": false,
+            "ticketPrice": 2
+          }
+        },
+        {
+          "order": 9,
+          "type": "transport",
+          "time": "19:10",
+          "title": "前往晚餐餐厅",
+          "location": "全聚德烤鸭店(王府井店)",
+          "address": "北京市东城区帅府园胡同9号",
+          "coordinates": {
+            "lng": 116.410233,
+            "lat": 39.918874
+          },
+          "duration": 20,
+          "description": "乘坐公交或打车前往王府井全聚德",
+          "transportation": {
+            "mode": "taxi",
+            "details": "打车约3公里"
+          },
+          "distanceInfo": {
+            "distance": 3.0,
+            "duration": 20,
+            "mode": "taxi"
+          },
+          "costEstimate": 18
+        },
+        {
+          "order": 10,
+          "type": "meal",
+          "time": "19:30",
+          "title": "全聚德烤鸭晚餐",
+          "location": "全聚德烤鸭店(王府井店)",
+          "address": "北京市东城区帅府园胡同9号",
+          "coordinates": {
+            "lng": 116.410233,
+            "lat": 39.918874
+          },
+          "category": "餐厅",
+          "poiId": "B000A7BD3C",
+          "mealType": "dinner",
+          "cuisine": "北京菜",
+          "duration": 90,
+          "description": "品尝正宗北京烤鸭，推荐套餐含烤鸭、鸭架汤、配菜等",
+          "costEstimate": 280,
+          "rating": 4.6,
+          "recommendedDishes": ["挂炉烤鸭", "鸭架汤", "芥末鸭掌", "宫保虾球"],
+          "tips": ["建议提前预订座位", "人均消费140元", "可打包带走"],
+          "bookingInfo": {
+            "requiresReservation": true,
+            "phone": "010-65252681"
+          }
+        }
+      ]
+    },
+    {
+      "dayNumber": 2,
+      "date": "2025-11-16",
+      "title": "长城雄姿 · 奥运风采",
+      "summary": "上午游览世界奇迹八达岭长城，下午参观奥林匹克公园鸟巢水立方",
+      "highlights": ["八达岭长城", "鸟巢", "水立方"],
+      "totalDistance": 85.6,
+      "totalDuration": 540,
+      "totalCost": 380,
+      "segments": [
+        {
+          "order": 1,
+          "type": "meal",
+          "time": "07:30",
+          "title": "酒店早餐",
+          "location": "北京王府井如家酒店",
+          "address": "北京市东城区王府井大街138号",
+          "coordinates": {
+            "lng": 116.410781,
+            "lat": 39.914492
+          },
+          "category": "餐厅",
+          "mealType": "breakfast",
+          "duration": 30,
+          "description": "酒店自助早餐",
+          "costEstimate": 0,
+          "notes": "包含在住宿费用中"
+        },
+        {
+          "order": 2,
+          "type": "transport",
+          "time": "08:00",
+          "title": "前往八达岭长城",
+          "location": "八达岭长城",
+          "address": "北京市延庆区G6京藏高速58号出口",
+          "coordinates": {
+            "lng": 116.017444,
+            "lat": 40.359801
+          },
+          "duration": 90,
+          "description": "乘坐877路公交直达八达岭长城",
+          "transportation": {
+            "mode": "bus",
+            "details": "德胜门877路公交",
+            "ticketPrice": 12
+          },
+          "distanceInfo": {
+            "distance": 70.0,
+            "duration": 90,
+            "mode": "bus"
+          },
+          "costEstimate": 12,
+          "tips": ["德胜门积水潭地铁站A口外乘车", "6:00发车，建议早点出发避开人流"]
+        },
+        {
+          "order": 3,
+          "type": "activity",
+          "time": "09:30",
+          "title": "八达岭长城登顶",
+          "location": "八达岭长城",
+          "address": "北京市延庆区G6京藏高速58号出口",
+          "coordinates": {
+            "lng": 116.017444,
+            "lat": 40.359801
+          },
+          "category": "景点",
+          "poiId": "B000A83N89",
+          "duration": 180,
+          "description": "攀登长城，体验不到长城非好汉的豪迈，推荐登至北八楼俯瞰群山",
+          "costEstimate": 40,
+          "rating": 4.8,
+          "tips": [
+            "穿舒适运动鞋，台阶陡峭",
+            "携带足够饮用水",
+            "推荐路线：登北线到北八楼",
+            "避开节假日人流高峰"
+          ],
+          "bookingInfo": {
+            "requiresReservation": true,
+            "advanceBookingDays": 1,
+            "ticketPrice": 40,
+            "bookingUrl": "https://ticket.badaling.cn"
+          }
+        },
+        {
+          "order": 4,
+          "type": "meal",
+          "time": "12:30",
+          "title": "长城脚下午餐",
+          "location": "八达岭饭店",
+          "address": "北京市延庆区八达岭景区内",
+          "coordinates": {
+            "lng": 116.020156,
+            "lat": 40.358927
+          },
+          "category": "餐厅",
+          "mealType": "lunch",
+          "cuisine": "中餐",
+          "duration": 60,
+          "description": "品尝当地农家菜",
+          "costEstimate": 120,
+          "rating": 4.2,
+          "recommendedDishes": ["炖柴鸡", "农家小炒肉", "手擀面"],
+          "notes": "景区餐饮，价格略高"
+        },
+        {
+          "order": 5,
+          "type": "transport",
+          "time": "13:30",
+          "title": "返回市区",
+          "location": "奥林匹克公园",
+          "address": "北京市朝阳区北辰路",
+          "coordinates": {
+            "lng": 116.391264,
+            "lat": 40.003451
+          },
+          "duration": 90,
+          "description": "乘877路返回德胜门，转乘地铁8号线至奥林匹克公园",
+          "transportation": {
+            "mode": "subway",
+            "details": "877路+地铁8号线"
+          },
+          "distanceInfo": {
+            "distance": 75.0,
+            "duration": 90,
+            "mode": "transit"
+          },
+          "costEstimate": 15
+        },
+        {
+          "order": 6,
+          "type": "activity",
+          "time": "15:00",
+          "title": "鸟巢外景参观",
+          "location": "国家体育场(鸟巢)",
+          "address": "北京市朝阳区国家体育场南路1号",
+          "coordinates": {
+            "lng": 116.392928,
+            "lat": 40.003255
+          },
+          "category": "景点",
+          "poiId": "B000A5Y7PZ",
+          "duration": 60,
+          "description": "参观2008年奥运会主体育场，感受奥运气氛",
+          "costEstimate": 50,
+          "rating": 4.6,
+          "tips": ["可选择购票入内参观", "外围免费拍照", "夜景更美"],
+          "bookingInfo": {
+            "requiresReservation": false,
+            "ticketPrice": 50
+          }
+        },
+        {
+          "order": 7,
+          "type": "transport",
+          "time": "16:00",
+          "title": "步行至水立方",
+          "location": "国家游泳中心(水立方)",
+          "address": "北京市朝阳区天辰东路11号",
+          "coordinates": {
+            "lng": 116.387733,
+            "lat": 40.004945
+          },
+          "duration": 10,
+          "description": "从鸟巢步行至水立方",
+          "transportation": {
+            "mode": "walk",
+            "details": "步行约600米"
+          },
+          "distanceInfo": {
+            "distance": 0.6,
+            "duration": 10,
+            "mode": "walk"
+          },
+          "costEstimate": 0
+        },
+        {
+          "order": 8,
+          "type": "activity",
+          "time": "16:10",
+          "title": "水立方游览",
+          "location": "国家游泳中心(水立方)",
+          "address": "北京市朝阳区天辰东路11号",
+          "coordinates": {
+            "lng": 116.387733,
+            "lat": 40.004945
+          },
+          "category": "景点",
+          "poiId": "B000A83RSG",
+          "duration": 50,
+          "description": "参观奥运游泳馆，欣赏梦幻般的蓝色泡泡建筑",
+          "costEstimate": 30,
+          "rating": 4.5,
+          "tips": ["夜晚灯光效果更佳", "可体验水上娱乐项目"],
+          "bookingInfo": {
+            "requiresReservation": false,
+            "ticketPrice": 30
+          }
+        },
+        {
+          "order": 9,
+          "type": "transport",
+          "time": "17:00",
+          "title": "返回王府井",
+          "location": "王府井大街",
+          "address": "北京市东城区王府井大街",
+          "coordinates": {
+            "lng": 116.410781,
+            "lat": 39.914492
+          },
+          "duration": 40,
+          "description": "乘坐地铁8号线返回王府井",
+          "transportation": {
+            "mode": "subway",
+            "details": "地铁8号线转1号线"
+          },
+          "distanceInfo": {
+            "distance": 10.0,
+            "duration": 40,
+            "mode": "subway"
+          },
+          "costEstimate": 4
+        },
+        {
+          "order": 10,
+          "type": "meal",
+          "time": "18:00",
+          "title": "王府井小吃街",
+          "location": "王府井小吃街",
+          "address": "北京市东城区王府井大街好友世界商场南侧",
+          "coordinates": {
+            "lng": 116.412458,
+            "lat": 39.915771
+          },
+          "category": "餐厅",
+          "mealType": "dinner",
+          "cuisine": "小吃",
+          "duration": 90,
+          "description": "品尝老北京特色小吃：爆肚、豆汁、糖葫芦等",
+          "costEstimate": 100,
+          "rating": 4.3,
+          "recommendedDishes": ["老北京爆肚", "豆汁焦圈", "糖葫芦", "炸酱面"],
+          "tips": ["价格参考，可自由选择", "注意卫生选择正规摊位"]
+        }
+      ]
+    },
+    {
+      "dayNumber": 3,
+      "date": "2025-11-17",
+      "title": "颐和园 · 返程",
+      "summary": "上午游览皇家园林颐和园，下午返程",
+      "highlights": ["颐和园", "昆明湖", "十七孔桥"],
+      "totalDistance": 25.5,
+      "totalDuration": 360,
+      "totalCost": 220,
+      "segments": [
+        {
+          "order": 1,
+          "type": "meal",
+          "time": "08:00",
+          "title": "酒店早餐",
+          "location": "北京王府井如家酒店",
+          "address": "北京市东城区王府井大街138号",
+          "coordinates": {
+            "lng": 116.410781,
+            "lat": 39.914492
+          },
+          "category": "餐厅",
+          "mealType": "breakfast",
+          "duration": 30,
+          "description": "酒店自助早餐",
+          "costEstimate": 0
+        },
+        {
+          "order": 2,
+          "type": "transport",
+          "time": "09:00",
+          "title": "前往颐和园",
+          "location": "颐和园",
+          "address": "北京市海淀区新建宫门路19号",
+          "coordinates": {
+            "lng": 116.275341,
+            "lat": 40.000570
+          },
+          "duration": 50,
+          "description": "乘坐地铁4号线至北宫门站",
+          "transportation": {
+            "mode": "subway",
+            "details": "地铁1号线转4号线"
+          },
+          "distanceInfo": {
+            "distance": 15.0,
+            "duration": 50,
+            "mode": "subway"
+          },
+          "costEstimate": 5
+        },
+        {
+          "order": 3,
+          "type": "activity",
+          "time": "09:50",
+          "title": "颐和园游览",
+          "location": "颐和园",
+          "address": "北京市海淀区新建宫门路19号",
+          "coordinates": {
+            "lng": 116.275341,
+            "lat": 40.000570
+          },
+          "category": "景点",
+          "poiId": "B000A8VP86",
+          "duration": 180,
+          "description": "游览中国保存最完整的皇家园林，参观佛香阁、长廊、十七孔桥、昆明湖等景点",
+          "costEstimate": 30,
+          "rating": 4.8,
+          "tips": [
+            "推荐路线：北宫门进→苏州街→佛香阁→长廊→十七孔桥→东宫门出",
+            "长廊有一万四千多幅彩画，值得细看",
+            "可乘坐游船游昆明湖",
+            "建议游览时间3-4小时"
+          ],
+          "bookingInfo": {
+            "requiresReservation": true,
+            "advanceBookingDays": 7,
+            "ticketPrice": 30,
+            "bookingUrl": "https://www.summerpalace-china.com"
+          }
+        },
+        {
+          "order": 4,
+          "type": "meal",
+          "time": "12:50",
+          "title": "颐和园周边午餐",
+          "location": "听鹂馆饭庄",
+          "address": "北京市海淀区颐和园内",
+          "coordinates": {
+            "lng": 116.274523,
+            "lat": 39.999234
+          },
+          "category": "餐厅",
+          "mealType": "lunch",
+          "cuisine": "宫廷菜",
+          "duration": 60,
+          "description": "品尝宫廷风味菜肴",
+          "costEstimate": 150,
+          "rating": 4.4,
+          "recommendedDishes": ["宫保鸡丁", "京酱肉丝", "豌豆黄"],
+          "tips": ["价格略高但环境优雅", "可选择周边其他餐厅"]
+        },
+        {
+          "order": 5,
+          "type": "transport",
+          "time": "13:50",
+          "title": "返回酒店取行李",
+          "location": "北京王府井如家酒店",
+          "address": "北京市东城区王府井大街138号",
+          "coordinates": {
+            "lng": 116.410781,
+            "lat": 39.914492
+          },
+          "duration": 50,
+          "description": "乘坐地铁返回酒店办理退房",
+          "transportation": {
+            "mode": "subway",
+            "details": "地铁4号线转1号线"
+          },
+          "distanceInfo": {
+            "distance": 15.0,
+            "duration": 50,
+            "mode": "subway"
+          },
+          "costEstimate": 5
+        },
+        {
+          "order": 6,
+          "type": "transport",
+          "time": "15:00",
+          "title": "前往北京南站",
+          "location": "北京南站",
+          "address": "北京市丰台区永外大街车站路12号",
+          "coordinates": {
+            "lng": 116.378631,
+            "lat": 39.865195
+          },
+          "duration": 45,
+          "description": "乘坐地铁前往北京南站",
+          "transportation": {
+            "mode": "subway",
+            "details": "地铁1号线转4号线"
+          },
+          "distanceInfo": {
+            "distance": 10.5,
+            "duration": 45,
+            "mode": "subway"
+          },
+          "costEstimate": 5
+        },
+        {
+          "order": 7,
+          "type": "transport",
+          "time": "16:00",
+          "title": "高铁返程",
+          "location": "目的地站",
+          "address": "返程目的地",
+          "coordinates": {
+            "lng": 0,
+            "lat": 0
+          },
+          "duration": 300,
+          "description": "乘坐高铁返回出发地",
+          "transportation": {
+            "mode": "train",
+            "details": "高铁G102次",
+            "ticketPrice": 550
+          },
+          "costEstimate": 550,
+          "notes": "提前30分钟进站候车"
+        }
+      ]
+    }
+  ],
+  "tips": {
+    "transportation": [
+      "购买北京一卡通或使用手机NFC功能乘坐地铁公交",
+      "打车使用滴滴、高德等正规平台",
+      "长城建议乘坐877路公交，性价比高"
+    ],
+    "accommodation": [
+      "王府井地区交通便利，是住宿首选",
+      "提前预订可享受优惠价格"
+    ],
+    "food": [
+      "必尝美食：北京烤鸭、炸酱面、豆汁、驴打滚",
+      "王府井小吃街适合体验各种小吃",
+      "注意饮食卫生，选择正规餐厅"
+    ],
+    "attractions": [
+      "故宫、长城需提前网上预约",
+      "建议错峰出行，避开周末和节假日",
+      "穿舒适的鞋子，景点步行较多"
+    ],
+    "weather": [
+      "11月北京气温5-15℃，早晚温差大",
+      "携带保暖外套和围巾",
+      "空气较干燥，注意补水保湿"
+    ],
+    "safety": [
+      "保管好贵重物品",
+      "不要轻信景点周边拉客人员",
+      "紧急情况拨打110或使用12345市民热线"
+    ]
+  },
+  "foodRecommendations": [
+    {
+      "name": "全聚德烤鸭",
+      "category": "名店",
+      "location": "王府井店",
+      "avgPrice": 140,
+      "mustTry": ["挂炉烤鸭", "鸭架汤"]
+    },
+    {
+      "name": "老北京炸酱面",
+      "category": "小吃",
+      "location": "护国寺小吃店",
+      "avgPrice": 30,
+      "mustTry": ["炸酱面", "豆汁"]
+    },
+    {
+      "name": "东来顺涮羊肉",
+      "category": "火锅",
+      "location": "王府井店",
+      "avgPrice": 80,
+      "mustTry": ["手切羊肉", "麻酱"]
+    }
+  ],
+  "shoppingSpots": [
+    {
+      "name": "王府井大街",
+      "type": "商业街",
+      "description": "北京最著名的商业街，品牌齐全",
+      "recommendedItems": ["特产", "服饰"]
+    },
+    {
+      "name": "故宫文创店",
+      "type": "文创店",
+      "description": "故宫特色文创产品",
+      "recommendedItems": ["胶带", "笔记本", "摆件"]
+    }
+  ],
+  "transportationSummary": {
+    "mainMode": "地铁+公交",
+    "totalDistance": 116.3,
+    "estimatedCost": 600,
+    "tips": "建议购买一卡通或使用手机NFC"
+  },
+  "fullPlan": "这是一份精心设计的北京3日游行程，涵盖了天安门、故宫、长城、颐和园等必游景点，同时安排了地道的北京美食体验。行程节奏适中，适合首次来北京的游客深度游览。",
+  "rawPlan": "北京文化深度游 3天2晚，预算2500元/人",
+  "status": "draft",
+  "tags": ["文化", "历史", "美食", "摄影"],
+  "isPublic": false,
+  "version": 1,
+  "createdAt": "2025-11-05T10:00:00Z",
+  "updatedAt": "2025-11-05T10:30:00Z"
+}
