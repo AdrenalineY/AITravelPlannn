@@ -66,15 +66,22 @@ export function ChatInterface({
       }
       setMessages(prev => [...prev, userMessage])
 
+      // 🔄 新建会话时生成 sessionGroupId
+      if (!currentSessionGroupId.current) {
+        currentSessionGroupId.current = crypto.randomUUID()
+        console.log('[ChatInterface] 生成新的 sessionGroupId:', currentSessionGroupId.current)
+        onSessionCreated?.(currentSessionGroupId.current)
+      }
+
       // 调用 Agent API
       const result = await agentServiceClient.runAgent({
         message: content,
-        sessionGroupId: currentSessionGroupId.current || undefined,  // 🔄 重构
+        sessionGroupId: currentSessionGroupId.current,  // 🔄 重构: 确保始终提供 sessionGroupId
         maxTurns: 10,
       })
 
-      // 更新会话分组 ID
-      if (result.sessionGroupId && !currentSessionGroupId.current) {
+      // 更新会话分组 ID (以服务器返回为准)
+      if (result.sessionGroupId && result.sessionGroupId !== currentSessionGroupId.current) {
         currentSessionGroupId.current = result.sessionGroupId
         onSessionCreated?.(result.sessionGroupId)
       }

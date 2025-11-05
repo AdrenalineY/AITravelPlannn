@@ -48,6 +48,7 @@ export default function ItineraryEditPage() {
 
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [saving, setSaving] = useState(false)  // 🆕 保存状态
   const [itinerary, setItinerary] = useState<ItineraryCard | null>(null)
   const [conversationSessionGroupId, setConversationSessionGroupId] = useState<string | null>(sessionGroupId)  // 🔄 重构
   const [mapMarkers, setMapMarkers] = useState<MapMarker[]>([])
@@ -215,15 +216,23 @@ export default function ItineraryEditPage() {
     setMessages(prev => [...prev, newUserMessage])
 
     try {
+      // 🔄 新建行程时生成 sessionGroupId
+      let currentSessionGroupId = conversationSessionGroupId
+      if (!currentSessionGroupId) {
+        currentSessionGroupId = crypto.randomUUID()
+        setConversationSessionGroupId(currentSessionGroupId)
+        console.log('[ItineraryEdit] 生成新的 sessionGroupId:', currentSessionGroupId)
+      }
+
       // 调用 Agent API
       const result = await agentServiceClient.runAgent({
         message: userMessage,
-        sessionGroupId: conversationSessionGroupId || undefined,  // 🔄 重构: sessionId → sessionGroupId
+        sessionGroupId: currentSessionGroupId,  // 🔄 重构: 确保始终提供 sessionGroupId
         maxTurns: 10,
       })
 
-      // 更新会话分组 ID
-      if (result.sessionGroupId && !conversationSessionGroupId) {
+      // 更新会话分组 ID (以服务器返回为准)
+      if (result.sessionGroupId && result.sessionGroupId !== currentSessionGroupId) {
         setConversationSessionGroupId(result.sessionGroupId)
       }
 
@@ -261,24 +270,74 @@ export default function ItineraryEditPage() {
 
   // 处理完成编辑
   const handleComplete = async () => {
+    // 🔄 防止重复提交
+    if (saving) {
+      console.log('[ItineraryEdit] 正在保存中,忽略重复点击')
+      return
+    }
+
     try {
+      // 验证必填字段
       if (!itinerary?.title || !itinerary?.destination) {
         message.warning('请先通过对话生成行程内容')
         return
       }
 
-      if (itineraryId) {
-        await itineraryCardService.update({ ...itinerary, id: itineraryId } as ItineraryCard)
-        message.success('行程已保存')
-      } else {
-        const newItinerary = await itineraryCardService.create(itinerary as ItineraryCard)
-        message.success('行程已创建')
+      // 验证 sessionGroupId
+      if (!conversationSessionGroupId && !itinerary.sessionGroupId) {
+        message.error('缺少会话标识,无法保存行程')
+        console.error('[ItineraryEdit] sessionGroupId 缺失:', {
+          conversationSessionGroupId,
+          itinerarySessionGroupId: itinerary.sessionGroupId
+        })
+        return
       }
 
-      router.push('/itineraries')
-    } catch (error) {
+      setSaving(true)
+      message.loading({ content: '正在保存行程...', key: 'saving', duration: 0 })
+
+      // 使用 conversationSessionGroupId 或 itinerary.sessionGroupId
+      const targetSessionGroupId = conversationSessionGroupId || itinerary.sessionGroupId!
+      
+      console.log('[ItineraryEdit] 开始保存行程:', {
+        mode: itineraryId ? 'update' : 'create',
+        itineraryId,
+        sessionGroupId: targetSessionGroupId,
+        title: itinerary.title
+      })
+
+      if (itineraryId) {
+        // 更新现有行程
+        await itineraryCardService.update({ 
+          ...itinerary, 
+          id: itineraryId,
+          sessionGroupId: targetSessionGroupId
+        } as ItineraryCard)
+        message.success({ content: '行程已保存', key: 'saving', duration: 2 })
+        console.log('[ItineraryEdit] 行程更新成功')
+      } else {
+        // 创建新行程
+        const newItinerary = await itineraryCardService.create({ 
+          ...itinerary,
+          sessionGroupId: targetSessionGroupId
+        } as ItineraryCard)
+        message.success({ content: '行程已创建', key: 'saving', duration: 2 })
+        console.log('[ItineraryEdit] 行程创建成功:', newItinerary.id)
+      }
+
+      // 延迟导航,让用户看到成功提示
+      setTimeout(() => {
+        router.push('/itineraries')
+      }, 500)
+    } catch (error: any) {
       console.error('[ItineraryEdit] 保存失败:', error)
-      message.error('保存失败')
+      message.error({ 
+        content: `保存失败: ${error.message || '未知错误'}`, 
+        key: 'saving',
+        duration: 3
+      })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -690,11 +749,13 @@ export default function ItineraryEditPage() {
               </Space>
               
               <Button
+                type="primary"
                 icon={<SaveOutlined />}
                 onClick={handleComplete}
-                disabled={!itinerary?.title}
+                loading={saving}
+                disabled={!itinerary?.title || saving}
               >
-                完成编辑
+                {saving ? '保存中...' : '完成编辑'}
               </Button>
             </Space>
           </div>

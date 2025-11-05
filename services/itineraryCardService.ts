@@ -330,8 +330,12 @@ class ItineraryCardServiceNew {
   }
 
   async create(itineraryCard: ItineraryCard): Promise<ItineraryCard> {
-    const sessionGroupId = itineraryCard.sessionGroupId || crypto.randomUUID()
-    return this.saveItineraryCard(itineraryCard, sessionGroupId)
+    // 🔄 确保 sessionGroupId 存在,避免重复创建
+    if (!itineraryCard.sessionGroupId) {
+      console.error('[ItineraryCardService] create() 缺少 sessionGroupId:', itineraryCard)
+      throw new Error('sessionGroupId is required for create')
+    }
+    return this.saveItineraryCard(itineraryCard, itineraryCard.sessionGroupId)
   }
 
   async update(itineraryCard: ItineraryCard): Promise<void> {
