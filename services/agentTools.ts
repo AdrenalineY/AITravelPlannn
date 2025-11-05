@@ -346,36 +346,75 @@ export class AgentTools {
   }
 
   /**
-   * 估算费用
+   * 估算费用 - 针对单个行程节点
    * 对应 Python 版本的 estimate_cost
    */
   static async estimateCost(
-    itemType: string,
+    categoryOrOld: string,  // 兼容旧调用方式
     details: any
   ): Promise<ToolResult> {
     const startTime = Date.now()
     try {
-      console.log(`[AgentTools] estimateCost: ${itemType}`, details)
+      // 解析参数 (兼容新旧格式)
+      let category: string
+      let nodeInfo: any
+      
+      if (typeof details === 'object' && details.category) {
+        // 新格式: category 在 details 中
+        category = details.category
+        nodeInfo = details
+      } else {
+        // 旧格式: category 作为第一个参数
+        category = categoryOrOld
+        nodeInfo = typeof details === 'string' ? { details } : details
+      }
+      
+      console.log(`[AgentTools] estimateCost - 节点费用估算:`, { category, ...nodeInfo })
 
-      // 构造估价 prompt
-      const prompt = `你是一个旅行预算估算专家。请根据以下信息估算费用:
+      // 验证类别
+      const validCategories = ['transport', 'ticket', 'accommodation', 'meal', 'shopping']
+      const categoryNames = {
+        transport: '交通',
+        ticket: '门票',
+        accommodation: '住宿',
+        meal: '餐饮',
+        shopping: '购物'
+      }
 
-项目类型: ${itemType}
-详细信息: ${typeof details === 'string' ? details : JSON.stringify(details, null, 2)}
+      // 构造更精确的估价 prompt
+      const prompt = `你是一个专业的旅行费用估算专家。请估算以下**单个行程节点**的费用:
 
-请以 JSON 格式返回估算结果,包含:
-- estimatedCost: 估算金额(如"1500-2500元")
-- details: 详细说明
-- reasoning: 估算理由
-- currency: 货币单位(默认"CNY")
+【费用类别】${categoryNames[category as keyof typeof categoryNames] || category}
+${nodeInfo.nodeType ? `【节点类型】${nodeInfo.nodeType}` : ''}
+${nodeInfo.location ? `【地点】${nodeInfo.location}` : ''}
+${nodeInfo.name ? `【节点名称】${nodeInfo.name}` : ''}
+${nodeInfo.details ? `【补充信息】${nodeInfo.details}` : ''}
+${nodeInfo.quantity ? `【数量/人数】${nodeInfo.quantity}` : ''}
+${nodeInfo.date ? `【日期】${nodeInfo.date}` : ''}
 
-示例输出:
+其他信息: ${typeof nodeInfo === 'string' ? nodeInfo : JSON.stringify(nodeInfo, null, 2)}
+
+请基于当前市场价格和地点信息,估算该节点的费用。
+
+返回 JSON 格式(只输出JSON,不要其他文字):
 {
-  "estimatedCost": "1500-2500元",
-  "details": "包含5天餐饮费用,中等餐厅",
-  "reasoning": "基于餐饮的标准市场价格估算",
+  "amount": 具体数字金额(元,不要范围),
+  "basePrice": 单价(如果适用),
+  "quantity": 数量(如果适用),
+  "breakdown": [
+    {"item": "明细项1", "amount": 金额},
+    {"item": "明细项2", "amount": 金额}
+  ],
+  "notes": "费用说明(1-2句话)",
+  "reasoning": "估算依据",
   "currency": "CNY"
-}`
+}
+
+**重要提示**:
+- amount 必须是具体数字,不要范围(如 60,不要 50-70)
+- 取该节点费用的合理中间值
+- 如果是按人数计算,在 breakdown 中列明
+- 考虑地点的消费水平(如北上广深vs二三线城市)`
 
       const response = await aiService.chat([
         { role: 'system', content: '你是一个专业的旅行预算分析师,提供准确的费用估算。' },
@@ -406,14 +445,19 @@ export class AgentTools {
       }
 
       const output: CostEstimateOutput = {
-        item: itemType,
-        estimatedCost: estimateData.estimatedCost || '待估算',
-        details: estimateData.details,
+        item: nodeInfo.name || category,
+        category: category as any,  // 添加类别字段
+        amount: estimateData.amount || 0,
+        basePrice: estimateData.basePrice,
+        quantity: estimateData.quantity || nodeInfo.quantity,
+        breakdown: estimateData.breakdown,
+        estimatedCost: estimateData.estimatedCost || `${estimateData.amount || 0}元`,
+        details: estimateData.notes || estimateData.details,
         reasoning: estimateData.reasoning || '基于市场价格估算',
         currency: estimateData.currency || 'CNY'
       }
 
-      const observation = `${itemType}的费用估算为 ${output.estimatedCost},${output.details || ''}。${output.reasoning}`
+      const observation = `${nodeInfo.name || category}的费用估算为 ${output.amount}元${output.details ? `,${output.details}` : ''}。${output.reasoning}`
 
       console.log(`[AgentTools] estimateCost completed in ${Date.now() - startTime}ms`)
 
@@ -463,7 +507,18 @@ ${naturalLanguagePlan}
 - 结束日期: ${context.endDate || '未知'}
 
 【提取要求】
-请严格按照以下 JSON Schema 提取信息。**只输出JSON,不要任何其他文字**:
+请严格按照以下 JSON Schema 提取信息。**只输出JSON,不要任何其他文字**。
+
+【费用类别映射规则】
+每个 segment 都必须填写 costEstimate(金额) 和 costCategory(类别),类别与 type 的对应关系如下:
+- type="transport" → costCategory="transport" (交通费用,如:地铁票、出租车、火车票、机票等)
+- type="meal" → costCategory="meal" (餐饮费用,如:早餐、午餐、晚餐、下午茶等)
+- type="accommodation" → costCategory="accommodation" (住宿费用,如:酒店、民宿等)
+- type="activity" → costCategory="ticket" (门票费用,如:景点门票、表演票、游乐场门票等)
+- type="shopping" → costCategory="shopping" (购物费用,如:特产购买、纪念品等)
+- type="rest" → 可以不填写费用字段,或 costEstimate=0
+
+**重要**: estimatedCost 的 breakdown 由系统自动汇总计算,不需要在 JSON 中手动填写!
 
 \`\`\`json
 {
@@ -487,24 +542,12 @@ ${naturalLanguagePlan}
   "theme": "行程主题",
   "specialRequests": ["特殊需求"],
   
-  "totalBudget": 总预算,
-  "budgetPerPerson": 人均预算,
+  "totalBudget": 总预算(可选,如果有单个节点费用,系统会自动计算),
+  "budgetPerPerson": 人均预算(可选,系统会自动计算),
   "currency": "CNY",
-  "estimatedCost": {
-    "total": 总费用,
-    "perPerson": 人均费用,
-    "breakdown": [
-      {
-        "category": "transport|accommodation|food|activity|shopping",
-        "amount": 金额,
-        "percentage": 占比(0-100),
-        "notes": "说明",
-        "items": [
-          {"name": "项目名", "amount": 金额, "quantity": 数量}
-        ]
-      }
-    ]
-  },
+  
+  // ⚠️ 注意: estimatedCost 的 breakdown 由系统自动计算,不需要手动填写
+  // 只需要在每个 segment 中正确填写 costEstimate 和 costCategory
   
   "accommodation": {
     "region": "住宿区域",
@@ -538,7 +581,14 @@ ${naturalLanguagePlan}
           "address": "详细地址(尽可能完整,包括城市、区县、街道、门牌号)",
           "description": "详细描述(说明在这个地点做什么)",
           "duration": 时长(分钟),
-          "costEstimate": 费用,
+          "costEstimate": 该节点的总费用(数字,必填),
+          "costCategory": "费用类别(必填,五选一): transport(交通) | ticket(门票) | accommodation(住宿) | meal(餐饮) | shopping(购物)",
+          "costDetails": {  // 可选,提供费用明细
+            "basePrice": 基础单价,
+            "quantity": 数量,
+            "breakdown": [{"item": "项目名", "amount": 金额}],
+            "notes": "费用说明"
+          },
           "rating": 评分,
           "tips": ["小贴士"],
           
@@ -747,6 +797,137 @@ ${naturalLanguagePlan}
           }
         })
       }
+      
+      // 🔧 **费用汇总计算** - 基于单个节点费用自动计算总预算
+      console.log('[AgentTools] 开始计算费用汇总...')
+      
+      const costSummary = {
+        transport: 0,
+        ticket: 0,
+        accommodation: 0,
+        meal: 0,
+        shopping: 0
+      }
+      
+      const costItems: Record<string, Array<{name: string, amount: number, dayNumber: number}>> = {
+        transport: [],
+        ticket: [],
+        accommodation: [],
+        meal: [],
+        shopping: []
+      }
+      
+      // 遍历所有天和segment,收集费用
+      if (planData.days && Array.isArray(planData.days)) {
+        planData.days.forEach((day: any) => {
+          if (day.segments && Array.isArray(day.segments)) {
+            day.segments.forEach((seg: any) => {
+              if (seg.costEstimate && seg.costEstimate > 0) {
+                // 根据 segment 类型确定费用类别
+                let category: keyof typeof costSummary = 'ticket'  // 默认
+                
+                if (seg.costCategory) {
+                  category = seg.costCategory
+                } else if (seg.type === 'transport') {
+                  category = 'transport'
+                } else if (seg.type === 'meal') {
+                  category = 'meal'
+                } else if (seg.type === 'accommodation') {
+                  category = 'accommodation'
+                } else if (seg.type === 'activity') {
+                  category = 'ticket'
+                }
+                
+                // 确保 category 合法
+                if (!costSummary.hasOwnProperty(category)) {
+                  category = 'ticket'
+                }
+                
+                costSummary[category] += seg.costEstimate
+                costItems[category].push({
+                  name: seg.title || seg.location,
+                  amount: seg.costEstimate,
+                  dayNumber: day.dayNumber
+                })
+                
+                // 同时设置 segment 的 costCategory
+                if (!seg.costCategory) {
+                  seg.costCategory = category
+                }
+              }
+            })
+          }
+        })
+      }
+      
+      // 计算总费用
+      const totalCost = Object.values(costSummary).reduce((sum, val) => sum + val, 0)
+      
+      console.log('[AgentTools] 费用汇总结果:', {
+        transport: costSummary.transport,
+        ticket: costSummary.ticket,
+        accommodation: costSummary.accommodation,
+        meal: costSummary.meal,
+        shopping: costSummary.shopping,
+        total: totalCost
+      })
+      
+      // 构建 estimatedCost breakdown
+      const breakdown = [
+        {
+          category: 'transport' as const,
+          amount: costSummary.transport,
+          percentage: totalCost > 0 ? Math.round((costSummary.transport / totalCost) * 100) : 0,
+          notes: '交通费用',
+          items: costItems.transport
+        },
+        {
+          category: 'ticket' as const,
+          amount: costSummary.ticket,
+          percentage: totalCost > 0 ? Math.round((costSummary.ticket / totalCost) * 100) : 0,
+          notes: '门票费用',
+          items: costItems.ticket
+        },
+        {
+          category: 'accommodation' as const,
+          amount: costSummary.accommodation,
+          percentage: totalCost > 0 ? Math.round((costSummary.accommodation / totalCost) * 100) : 0,
+          notes: '住宿费用',
+          items: costItems.accommodation
+        },
+        {
+          category: 'meal' as const,
+          amount: costSummary.meal,
+          percentage: totalCost > 0 ? Math.round((costSummary.meal / totalCost) * 100) : 0,
+          notes: '餐饮费用',
+          items: costItems.meal
+        },
+        {
+          category: 'shopping' as const,
+          amount: costSummary.shopping,
+          percentage: totalCost > 0 ? Math.round((costSummary.shopping / totalCost) * 100) : 0,
+          notes: '购物费用',
+          items: costItems.shopping
+        }
+      ].filter(item => item.amount > 0)  // 只保留有费用的类别
+      
+      // 计算人均费用
+      const travelers = planData.travelers || context.travelers || 1
+      const perPersonCost = totalCost > 0 ? Math.round(totalCost / travelers) : 0
+      
+      // 更新或创建 estimatedCost
+      planData.estimatedCost = {
+        total: totalCost,
+        perPerson: perPersonCost,
+        breakdown: breakdown
+      }
+      
+      // 如果没有totalBudget,使用计算出的费用
+      if (!planData.totalBudget && totalCost > 0) {
+        planData.totalBudget = totalCost
+      }
+      
+      console.log('[AgentTools] ✅ 费用汇总计算完成')
       
       // 构建完整的 ItineraryCard
       // 注意: 不需要生成 id,让数据库自动生成 UUID

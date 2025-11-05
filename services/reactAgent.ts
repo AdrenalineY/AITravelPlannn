@@ -92,13 +92,44 @@ export class ReactAgent {
   - Action: search_nearby: 故宫, restaurant, 1000  (❌错误:缺少城市)
   - Action: search_nearby: 邯郸路校区, restaurant, 1000  (❌错误:不完整,应为"上海复旦大学邯郸路校区")
 
-### 3. estimate_cost - 估算费用
-**格式**: Action: estimate_cost: {"type":"项目类型","详细字段..."}
-**参数**: JSON格式的详细信息
-**用途**: 估算住宿、餐饮、交通、门票等各项费用
-**示例**: 
-  - Action: estimate_cost: {"type":"住宿","location":"北京","nights":3,"level":"中等"}
-  - Action: estimate_cost: {"type":"餐饮","location":"成都","days":3,"people":2,"level":"普通"}
+### 3. estimate_cost - 估算单个行程节点的费用
+**格式**: Action: estimate_cost: {"category":"费用类别","节点信息..."}
+**重要**: 此工具用于估算**行程时间轴中的单个节点费用**,而非整体预算
+
+**费用类别 (category)** - 必须是以下五种之一:
+  - **transport**: 交通费用 (地铁、公交、出租车、火车、飞机等)
+  - **ticket**: 门票费用 (景点门票、演出票、展览票等)
+  - **accommodation**: 住宿费用 (酒店、民宿等,按晚计算)
+  - **meal**: 餐饮费用 (早餐、午餐、晚餐、小吃等)
+  - **shopping**: 购物费用 (纪念品、特产等)
+
+**使用场景** - 针对行程中的每个具体节点:
+  1. **单次交通**: 从A地到B地的某次地铁/公交/打车
+  2. **单个景点门票**: 某个景点的门票价格
+  3. **单晚住宿**: 某个酒店一晚的房费
+  4. **单餐费用**: 某一顿饭(早/午/晚餐)的人均或总费用
+  5. **单次购物**: 某个购物点的预计花费
+
+**参数说明**:
+  - category: 必填,五大类别之一 (transport|ticket|accommodation|meal|shopping)
+  - nodeType: 必填,节点类型 (transport|activity|meal|accommodation|shopping)
+  - location: 必填,地点 (城市+具体地点,如"北京故宫博物院")
+  - name: 必填,节点名称 (如"故宫门票"、"午餐"、"地铁出行")
+  - details: 选填,补充信息 (如人数、餐厅档次、交通工具等)
+  - quantity: 选填,数量 (如人数、晚数)
+  - date: 选填,日期 (影响价格的季节因素)
+
+**示例**:
+  - Action: estimate_cost: {"category":"ticket","nodeType":"activity","location":"北京故宫博物院","name":"故宫门票","details":"成人票","quantity":2}
+  - Action: estimate_cost: {"category":"meal","nodeType":"meal","location":"成都宽窄巷子","name":"午餐","details":"川菜馆,中等消费","quantity":2}
+  - Action: estimate_cost: {"category":"transport","nodeType":"transport","location":"北京","name":"地铁出行","details":"从天安门到颐和园,地铁4号线","quantity":2}
+  - Action: estimate_cost: {"category":"accommodation","nodeType":"accommodation","location":"上海外滩","name":"酒店住宿","details":"四星级酒店","quantity":1}
+
+**⚠️ 注意事项**:
+  - **不要估算整体费用**,只估算单个节点
+  - **每个有费用的节点都应该调用一次**此工具
+  - 如果行程中有10个节点产生费用,应调用10次该工具
+  - 最终的总预算由系统自动汇总计算
 
 ## Thought 原则
 1. **需求分析**: 理解用户的旅行目的、偏好、预算、时间等核心需求

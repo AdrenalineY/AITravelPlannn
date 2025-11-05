@@ -185,15 +185,17 @@ export interface VoiceIntent {
   parameters: Record<string, any>
 }
 
-// 费用相关类型
+// 费用相关类型 - 统一的五大类别
+export type CostCategory = 'transport' | 'ticket' | 'accommodation' | 'meal' | 'shopping'
+
 export interface Budget {
   total: number
   categories: {
-    transportation: number
-    accommodation: number
-    food: number
-    activities: number
-    shopping: number
+    transport: number      // 交通
+    ticket: number         // 门票
+    accommodation: number  // 住宿
+    meal: number          // 餐饮
+    shopping: number      // 购物
   }
   currency: string
 }
@@ -202,7 +204,7 @@ export interface Expense {
   id: string
   itineraryId: string
   amount: number
-  category: ExpenseCategory
+  category: CostCategory
   description: string
   date: string
   location?: string
@@ -210,7 +212,7 @@ export interface Expense {
   currency: string
 }
 
-export type ExpenseCategory = 'transportation' | 'accommodation' | 'food' | 'activities' | 'shopping'
+export type ExpenseCategory = CostCategory  // 向后兼容
 
 export interface ExpenseAnalytics {
   totalsByCategory: Record<ExpenseCategory, number>
@@ -350,19 +352,30 @@ export interface POISearchOutput {
 }
 
 export interface CostEstimateInput {
-  itemType: string
-  details: any
-  destination?: string
-  travelDate?: string
+  category: 'transport' | 'ticket' | 'accommodation' | 'meal' | 'shopping'  // 费用类别
+  nodeType: string      // 节点类型
+  location: string      // 地点
+  name: string          // 节点名称
+  details?: string      // 补充信息
+  quantity?: number     // 数量/人数
+  date?: string         // 日期
+  [key: string]: any    // 其他参数
 }
 
 export interface CostEstimateOutput {
-  item: string
-  estimatedCost: string
-  details?: string
-  reasoning: string
-  lowHighRange?: [number, number]
-  currency?: string
+  item: string          // 项目名称
+  category: 'transport' | 'ticket' | 'accommodation' | 'meal' | 'shopping'  // 费用类别
+  amount: number        // 具体金额
+  basePrice?: number    // 单价
+  quantity?: number     // 数量
+  breakdown?: Array<{   // 费用明细
+    item: string
+    amount: number
+  }>
+  estimatedCost: string // 格式化的费用描述(如"60元")
+  details?: string      // 详细说明
+  reasoning: string     // 估算依据
+  currency?: string     // 货币单位
 }
 
 // 旅行计划卡片 (结构化输出) - 增强版
@@ -403,17 +416,18 @@ export interface ItineraryCard {
   budgetPerPerson?: number   // 人均预算
   currency?: string          // 货币单位 'CNY'|'USD'
   estimatedCost?: {
-    total: number
-    perPerson: number
+    total: number            // 总费用
+    perPerson: number        // 人均费用
     breakdown: Array<{
-      category: 'transport' | 'accommodation' | 'food' | 'activity' | 'shopping' | 'other'
-      amount: number
-      percentage?: number    // 占比
-      notes?: string
-      items?: Array<{        // 明细项
-        name: string
-        amount: number
-        quantity?: number
+      category: 'transport' | 'ticket' | 'accommodation' | 'meal' | 'shopping'  // 统一五大类
+      amount: number         // 该类别总金额
+      percentage?: number    // 占总预算的比例 (0-100)
+      notes?: string         // 说明
+      items?: Array<{        // 该类别下的明细项
+        name: string         // 项目名称
+        amount: number       // 单项金额
+        quantity?: number    // 数量
+        dayNumber?: number   // 所属天数
       }>
     }>
   }
@@ -457,7 +471,17 @@ export interface ItineraryCard {
       }
       description: string      // 描述
       duration?: number        // 时长(分钟)
-      costEstimate?: number    // 费用估算
+      costEstimate?: number    // 费用估算 (该节点的总费用)
+      costCategory?: 'transport' | 'ticket' | 'accommodation' | 'meal' | 'shopping'  // 费用类别
+      costDetails?: {          // 费用明细 (可选)
+        basePrice?: number     // 基础价格
+        quantity?: number      // 数量 (如人数)
+        breakdown?: Array<{    // 细分项 (可选)
+          item: string         // 项目名
+          amount: number       // 金额
+        }>
+        notes?: string         // 费用说明
+      }
       rating?: number          // 评分
       tips?: string[]          // 小贴士
       // 用餐信息 (当 type='meal' 时)
