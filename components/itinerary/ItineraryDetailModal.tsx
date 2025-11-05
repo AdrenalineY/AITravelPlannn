@@ -479,7 +479,9 @@ export function ItineraryDetailModal({
       transport: '交通',
       accommodation: '住宿',
       food: '餐饮',
+      meal: '餐饮',  // 🆕 添加 meal 映射
       activity: '活动',
+      ticket: '门票',  // 🆕 添加 ticket 映射
       shopping: '购物',
     }
     return map[category] || category

@@ -411,6 +411,7 @@ export default function ItinerariesPage() {
                   onShare={() => handleShare(itinerary)}
                   onFavorite={() => handleFavorite(itinerary)}
                   isFavorite={favorites.has(itinerary.id)}
+                  showCover={false}
                 />
               </Col>
             ))}
@@ -427,6 +428,7 @@ export default function ItinerariesPage() {
                 onFavorite={() => handleFavorite(itinerary)}
                 isFavorite={favorites.has(itinerary.id)}
                 compact
+                showCover={false}
               />
             ))}
           </div>

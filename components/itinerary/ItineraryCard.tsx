@@ -30,6 +30,7 @@ interface ItineraryCardProps {
   isFavorite?: boolean
   showActions?: boolean
   compact?: boolean
+  showCover?: boolean  // 🆕 控制是否显示封面图
 }
 
 export function ItineraryCard({
@@ -41,6 +42,7 @@ export function ItineraryCard({
   isFavorite = false,
   showActions = true,
   compact = false,
+  showCover = true,  // 🆕 默认显示封面图
 }: ItineraryCardProps) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '未设定'
@@ -212,17 +214,19 @@ export function ItineraryCard({
         onClick={handleCardClick}
         className="itinerary-card transition-all hover:shadow-xl"
         cover={
-          <div
-            className="h-48 bg-cover bg-center relative"
-            style={{ backgroundImage: `url(${getCoverImage()})` }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
-            <div className="absolute bottom-0 left-0 right-0 p-4">
-              <Title level={4} className="!mb-0 !text-white truncate">
-                {itinerary.title || '未命名行程'}
-              </Title>
+          showCover ? (
+            <div
+              className="h-48 bg-cover bg-center relative"
+              style={{ backgroundImage: `url(${getCoverImage()})` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <Title level={4} className="!mb-0 !text-white truncate">
+                  {itinerary.title || '未命名行程'}
+                </Title>
+              </div>
             </div>
-          </div>
+          ) : undefined
         }
         actions={
           showActions
@@ -247,6 +251,16 @@ export function ItineraryCard({
         }
       >
         <div className="space-y-3">
+          {/* 🆕 不显示封面时在内容区显示标题 */}
+          {!showCover && (
+            <>
+              <Title level={4} className="!mb-2 truncate">
+                {itinerary.title || '未命名行程'}
+              </Title>
+              <Divider className="!my-2" />
+            </>
+          )}
+          
           {/* 目的地和日期 */}
           <div>
             <Space direction="vertical" size="small" className="w-full">
