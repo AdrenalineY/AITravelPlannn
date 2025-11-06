@@ -802,11 +802,17 @@ ${planFormatted}
     try {
       // 从上下文中提取已知信息
       const contextInfo = this.extractContextInfo(naturalLanguagePlan)
+      
+      // 🔥 重要: 传递 sessionId 和 userId 确保数据一致性
+      contextInfo.sessionId = this.context.sessionId
+      contextInfo.userId = this.context.userId
 
       const plan = await AgentTools.extractPlanStructure(naturalLanguagePlan, contextInfo)
 
       if (plan) {
-        console.log('[ReactAgent] Plan structure extracted successfully')
+        // 🔥 确保提取的计划包含正确的 sessionGroupId
+        plan.sessionGroupId = this.context.sessionId
+        console.log('[ReactAgent] Plan structure extracted successfully, sessionGroupId:', plan.sessionGroupId)
         return plan
       }
 
@@ -826,6 +832,8 @@ ${planFormatted}
     budget?: number
     startDate?: string
     endDate?: string
+    sessionId?: string
+    userId?: string
   } {
     const info: any = {}
 

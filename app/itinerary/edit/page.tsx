@@ -132,7 +132,7 @@ export default function ItineraryEditPage() {
     }
   }, [isDraggingVertical, isDraggingHorizontal])
 
-  // 加载行程数据
+  // 加载行程数据和历史对话
   useEffect(() => {
     const loadItinerary = async () => {
       if (!itineraryId) {
@@ -154,12 +154,91 @@ export default function ItineraryEditPage() {
         if (data) {
           setItinerary(data)
           extractMapMarkers(data)
-          setMessages([{
-            id: 'loaded',
-            role: 'assistant',
-            content: `已加载行程"${data.title}"。您可以继续对话来调整和完善行程计划。`,
-            timestamp: new Date().toISOString(),
-          }])
+          
+          // 🔄 加载历史对话
+          if (data.sessionGroupId) {
+            console.log('[ItineraryEdit] 加载历史对话, sessionGroupId:', data.sessionGroupId)
+            try {
+              const session = await agentServiceClient.getSession(data.sessionGroupId)
+              console.log('[ItineraryEdit] 会话信息加载成功:', session)
+              
+              // 🔄 同步 conversationSessionGroupId
+              setConversationSessionGroupId(data.sessionGroupId)
+              
+              const historyMessages: Message[] = []
+              
+              if (session.rebuiltFromItinerary) {
+                // 🔥 如果是基于行程重建的会话，显示行程计划作为历史
+                console.log('[ItineraryEdit] 检测到重建会话，显示行程计划')
+                if (session.naturalPlan) {
+                  historyMessages.push({
+                    id: 'rebuilt-plan',
+                    role: 'assistant',
+                    content: session.naturalPlan,
+                    timestamp: new Date().toISOString(),
+                  })
+                }
+                
+                historyMessages.push({
+                  id: 'loaded',
+                  role: 'assistant',
+                  content: `已加载行程"${data.title}"。由于历史对话不可用，这里显示的是行程计划。您可以继续对话来调整和完善行程。`,
+                  timestamp: new Date().toISOString(),
+                })
+              } else {
+                // 正常的对话历史
+                const history = session.messages || []
+                console.log('[ItineraryEdit] 历史对话加载成功:', history.length, '条')
+                
+                history.forEach((msg, index) => {
+                  // 用户消息
+                  if (msg.user) {
+                    historyMessages.push({
+                      id: `history-user-${index}`,
+                      role: 'user',
+                      content: msg.user,
+                      timestamp: new Date().toISOString(),
+                    })
+                  }
+                  // AI 回复
+                  if (msg.assistant) {
+                    historyMessages.push({
+                      id: `history-assistant-${index}`,
+                      role: 'assistant',
+                      content: msg.assistant,
+                      timestamp: new Date().toISOString(),
+                    })
+                  }
+                })
+                
+                historyMessages.push({
+                  id: 'loaded',
+                  role: 'assistant',
+                  content: `已加载行程"${data.title}"及其对话历史(${history.length}轮对话)。您可以继续对话来调整和完善行程计划。`,
+                  timestamp: new Date().toISOString(),
+                })
+              }
+              
+              setMessages(historyMessages)
+            } catch (historyError) {
+              console.error('[ItineraryEdit] 加载历史对话失败:', historyError)
+              // 即使历史加载失败,也显示基本提示
+              setMessages([{
+                id: 'loaded',
+                role: 'assistant',
+                content: `已加载行程"${data.title}"。历史对话加载失败,但您可以继续对话来调整行程。`,
+                timestamp: new Date().toISOString(),
+              }])
+            }
+          } else {
+            // 没有 sessionGroupId,可能是旧数据
+            setMessages([{
+              id: 'loaded',
+              role: 'assistant',
+              content: `已加载行程"${data.title}"。您可以继续对话来调整和完善行程计划。`,
+              timestamp: new Date().toISOString(),
+            }])
+          }
         } else {
           message.error('行程不存在')
           router.push('/itineraries')
@@ -216,15 +295,20 @@ export default function ItineraryEditPage() {
     setMessages(prev => [...prev, newUserMessage])
 
     try {
-      // 🔄 新建行程时生成 sessionGroupId
-      let currentSessionGroupId = conversationSessionGroupId
-      if (!currentSessionGroupId) {
-        currentSessionGroupId = crypto.randomUUID()
-        setConversationSessionGroupId(currentSessionGroupId)
-        console.log('[ItineraryEdit] 生成新的 sessionGroupId:', currentSessionGroupId)
-      }
-
-      // 调用 Agent API
+        // 🔄 新建行程时生成 sessionGroupId
+        let currentSessionGroupId = conversationSessionGroupId
+        if (!currentSessionGroupId) {
+          currentSessionGroupId = crypto.randomUUID()
+          setConversationSessionGroupId(currentSessionGroupId)
+          console.log('[ItineraryEdit] 生成新的 sessionGroupId:', currentSessionGroupId)
+        }
+        
+        // 🔥 如果已有行程但没有会话ID，使用行程的 sessionGroupId
+        if (!currentSessionGroupId && itinerary?.sessionGroupId) {
+          currentSessionGroupId = itinerary.sessionGroupId
+          setConversationSessionGroupId(currentSessionGroupId)
+          console.log('[ItineraryEdit] 使用行程的 sessionGroupId:', currentSessionGroupId)
+        }      // 调用 Agent API
       const result = await agentServiceClient.runAgent({
         message: userMessage,
         sessionGroupId: currentSessionGroupId,  // 🔄 重构: 确保始终提供 sessionGroupId
@@ -249,8 +333,13 @@ export default function ItineraryEditPage() {
 
       // 如果生成了行程,更新显示
       if (result.planExtracted) {
-        setItinerary(result.planExtracted as ItineraryCard)
-        extractMapMarkers(result.planExtracted as ItineraryCard)
+        const updatedItinerary = result.planExtracted as ItineraryCard
+        // 🔥 确保行程包含正确的 sessionGroupId
+        if (currentSessionGroupId && !updatedItinerary.sessionGroupId) {
+          updatedItinerary.sessionGroupId = currentSessionGroupId
+        }
+        setItinerary(updatedItinerary)
+        extractMapMarkers(updatedItinerary)
         message.success('行程已更新')
       }
     } catch (error) {

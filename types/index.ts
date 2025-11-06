@@ -254,14 +254,24 @@ export interface ChatMessage {
 // ========== ReAct Agent 相关类型 ==========
 
 export interface ConversationSession {
-  id: string
+  id?: string  // 兼容旧代码
+  sessionGroupId: string  // 🔄 重构: 使用 session_group_id
   userId: string
   title?: string
-  itineraryId?: string
-  userPreferences: Record<string, any>
-  isActive: boolean
+  destination?: string  // 🔄 新增: 目标目的地
+  itineraryId?: string  // 兼容旧代码
+  userPreferences?: Record<string, any>  // 兼容旧代码
+  isActive?: boolean  // 兼容旧代码
   createdAt: string
   updatedAt: string
+  messageCount?: number  // 🔄 新增: 消息数量
+  messages?: Array<{  // 🔄 新增: 对话历史
+    user: string
+    assistant: string
+  }>
+  // 🔥 数据同步修复相关字段
+  rebuiltFromItinerary?: boolean  // 标记是否从行程卡片重建
+  naturalPlan?: string  // 自然语言行程描述
 }
 
 export interface AgentRun {

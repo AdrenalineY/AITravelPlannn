@@ -124,10 +124,10 @@ export class AgentServiceClient {
   }
 
   /**
-   * 获取单个会话
+   * 获取单个会话及其对话历史
    */
-  static async getSession(sessionId: string): Promise<ConversationSession> {
-    const response = await fetch(`/api/agent/session?sessionId=${sessionId}`)
+  static async getSession(sessionGroupId: string): Promise<ConversationSession> {
+    const response = await fetch(`/api/agent/session?sessionGroupId=${sessionGroupId}`)
 
     if (!response.ok) {
       const error = await response.json()
@@ -136,6 +136,14 @@ export class AgentServiceClient {
 
     const data = await response.json()
     return data.session
+  }
+
+  /**
+   * 获取会话的对话历史
+   */
+  static async getSessionHistory(sessionGroupId: string): Promise<Array<{ user: string; assistant: string }>> {
+    const session = await this.getSession(sessionGroupId)
+    return session.messages || []
   }
 
   /**

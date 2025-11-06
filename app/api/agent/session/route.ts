@@ -68,15 +68,46 @@ export async function GET(request: NextRequest) {
 
     if (sessionGroupId) {
       // 获取单个会话的信息（从 agent_runs 重建）
-      const { data: runs, error } = await supabase
+      const { data: runs, error: runsError } = await supabase
         .from('agent_runs')
         .select('session_title, target_destination, created_at, user_message, final_answer')
         .eq('session_group_id', sessionGroupId)
         .eq('user_id', user.id)
         .order('created_at', { ascending: true })
 
-      if (error || !runs || runs.length === 0) {
-        return NextResponse.json({ error: '会话不存在' }, { status: 404 })
+      // 🔥 修复: 如果 agent_runs 中没有记录，尝试从 itinerary_cards 获取基本信息
+      if (runsError || !runs || runs.length === 0) {
+        console.log('[Session API] agent_runs 中无记录，尝试从 itinerary_cards 获取信息')
+        
+        const { data: itineraryCard, error: cardError } = await supabase
+          .from('itinerary_cards')
+          .select('title, destination, created_at, natural_plan')
+          .eq('session_group_id', sessionGroupId)
+          .eq('user_id', user.id)
+          .single()
+        
+        if (cardError || !itineraryCard) {
+          console.error('[Session API] 会话和行程都不存在:', { runsError, cardError })
+          return NextResponse.json({ error: '会话不存在' }, { status: 404 })
+        }
+        
+        // 基于行程卡片重建会话信息
+        const session = {
+          sessionGroupId,
+          title: itineraryCard.title || '行程对话',
+          destination: itineraryCard.destination || '',
+          userId: user.id,
+          createdAt: itineraryCard.created_at,
+          updatedAt: itineraryCard.created_at,
+          messageCount: 0,
+          messages: [],
+          // 标记这是基于行程卡片重建的
+          rebuiltFromItinerary: true,
+          naturalPlan: itineraryCard.natural_plan
+        }
+        
+        console.log('[Session API] 基于行程卡片重建会话信息成功')
+        return NextResponse.json({ session })
       }
 
       // 重建会话信息
