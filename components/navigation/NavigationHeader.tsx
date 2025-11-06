@@ -33,7 +33,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
         router.push('/setup/api-config')
         break
       case 'profile':
-        message.info('个人信息功能开发中')
+        router.push('/profile')
         break
       case 'logout':
         authService.signOut()

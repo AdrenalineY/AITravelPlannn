@@ -19,6 +19,14 @@ export interface UserProfile {
   currency?: string
 }
 
+// 用户旅行偏好配置
+export interface TravelPreferencesProfile {
+  gender?: 'male' | 'female' | 'other'     // 性别
+  age?: number                               // 年龄
+  city?: string                              // 居住城市
+  personalInterests?: string                 // 个人喜好（自由文本，最多2000字符）
+}
+
 // API 配置相关类型
 export interface APIConfig {
   llm: {
