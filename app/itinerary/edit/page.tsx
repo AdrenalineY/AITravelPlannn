@@ -28,8 +28,9 @@ import { itineraryCardService } from '@/services/itineraryCardService'
 import { agentServiceClient } from '@/services/agentServiceClient'
 import { useAuthStore } from '@/store/authStore'
 import { authService } from '@/services/authService'
+import { NavigationHeader } from '@/components/navigation/NavigationHeader'
 
-const { Header, Content } = Layout
+const { Content } = Layout
 const { TextArea } = Input
 
 interface Message {
@@ -430,25 +431,7 @@ export default function ItineraryEditPage() {
     }
   }
 
-  // 顶部导航
-  const handleNavigation = (key: string) => {
-    switch (key) {
-      case 'itineraries':
-        router.push('/itineraries')
-        break
-      case 'settings':
-        router.push('/setup')
-        break
-      case 'profile':
-        message.info('个人信息功能开发中')
-        break
-      case 'logout':
-        authService.signOut()
-        resetAuth()
-        router.push('/auth/signin')
-        break
-    }
-  }
+
 
   if (loading) {
     return (
@@ -476,56 +459,7 @@ export default function ItineraryEditPage() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {/* 顶部导航栏 */}
-      <Header style={{ 
-        background: '#001529', 
-        padding: '0 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-      }}>
-        <div style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>
-          AI 旅行规划助手
-        </div>
-        
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<UnorderedListOutlined />}
-            onClick={() => handleNavigation('itineraries')}
-            style={{ color: 'white' }}
-          >
-            我的行程
-          </Button>
-          <Button
-            type="text"
-            icon={<SettingOutlined />}
-            onClick={() => handleNavigation('settings')}
-            style={{ color: 'white' }}
-          >
-            API 设置
-          </Button>
-          <Button
-            type="text"
-            icon={<UserOutlined />}
-            onClick={() => handleNavigation('profile')}
-            style={{ color: 'white' }}
-          >
-            个人信息
-          </Button>
-          <Button
-            type="text"
-            icon={<LogoutOutlined />}
-            onClick={() => handleNavigation('logout')}
-            style={{ color: 'white' }}
-            danger
-          >
-            退出
-          </Button>
-        </Space>
-      </Header>
+      <NavigationHeader />
 
       {/* 主内容区域 */}
       <Content ref={contentRef} style={{ display: 'flex', height: 'calc(100vh - 64px)' }}>

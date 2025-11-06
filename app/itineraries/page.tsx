@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons'
 import { ItineraryCard } from '@/components/itinerary/ItineraryCard'
 import { ItineraryDetailModal } from '@/components/itinerary/ItineraryDetailModal'
+import { NavigationHeader } from '@/components/navigation/NavigationHeader'
 import type { ItineraryCard as ItineraryCardType } from '@/types'
 import { useRouter } from 'next/navigation'
 import { itineraryCardService } from '@/services/itineraryCardService'
@@ -315,6 +316,8 @@ export default function ItinerariesPage() {
 
   return (
     <Layout className="min-h-screen bg-gray-50">
+      {/* 顶部导航栏 */}
+      <NavigationHeader />
       <Content className="p-6">
         {/* 页面标题和操作栏 */}
         <div className="mb-6">
