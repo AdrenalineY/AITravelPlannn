@@ -13,6 +13,7 @@ import {
 } from '@/types'
 import { aiService } from './aiService'
 import { AgentTools } from './agentTools'
+import { itineraryJsonToText } from './itineraryJsonToText'
 import { createClient } from '@/lib/supabase/client'
 import AgentConfig from '@/config/agent.config'
 
@@ -937,6 +938,12 @@ ${planFormatted}
       // 🔥 重要: 传递 sessionId 和 userId 确保数据一致性
       contextInfo.sessionId = this.context.sessionId
       contextInfo.userId = this.context.userId
+      
+      // 🔥 新增: 如果存在现有行程,传递给 extractPlanStructure
+      if (this.context.currentPlan) {
+        console.log('[ReactAgent] 传递现有行程到 extractPlanStructure,将保持未修改部分')
+        contextInfo.existingItinerary = this.context.currentPlan
+      }
 
       const plan = await AgentTools.extractPlanStructure(naturalLanguagePlan, contextInfo)
 
@@ -965,6 +972,7 @@ ${planFormatted}
     endDate?: string
     sessionId?: string
     userId?: string
+    existingItinerary?: ItineraryCard  // 🔥 新增
   } {
     const info: any = {}
 
@@ -1082,6 +1090,29 @@ export async function createReactAgent(
 
   if (itineraryCard?.plan_data) {
     currentPlan = itineraryCard.plan_data as ItineraryCard
+    
+    // 🔥 新功能: 如果存在行程卡片,将其转换为自然语言文本,作为上下文
+    console.log('[ReactAgent] 检测到已有行程,开始转换为自然语言...')
+    try {
+      const naturalLanguagePlan = await itineraryJsonToText.convertToNaturalLanguage(currentPlan)
+      console.log('[ReactAgent] 行程转换完成,文本长度:', naturalLanguagePlan.length)
+      
+      // 将自然语言描述添加到对话历史的开头,作为上下文
+      conversationHistory.unshift({
+        role: 'system',
+        content: `【当前已有行程计划】\n以下是用户当前的旅行行程安排,请在此基础上进行编辑、调整或优化:\n\n${naturalLanguagePlan}\n\n---\n请基于用户的新需求,对上述行程进行相应的修改。保持原有合理的安排,只针对用户提出的问题进行调整。`
+      })
+      
+      console.log('[ReactAgent] 行程上下文已添加到对话历史')
+    } catch (error) {
+      console.error('[ReactAgent] 行程转换失败,使用降级方案:', error)
+      // 降级方案: 使用同步方法
+      const naturalLanguagePlan = itineraryJsonToText.convertToNaturalLanguageSync(currentPlan)
+      conversationHistory.unshift({
+        role: 'system',
+        content: `【当前已有行程计划】\n以下是用户当前的旅行行程安排:\n\n${naturalLanguagePlan}\n\n---\n请基于用户的新需求进行调整。`
+      })
+    }
   }
 
   const context: AgentContext = {

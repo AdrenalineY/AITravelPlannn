@@ -77,7 +77,7 @@ export function ChatInterface({
       const result = await agentServiceClient.runAgent({
         message: content,
         sessionGroupId: currentSessionGroupId.current,  // 🔄 重构: 确保始终提供 sessionGroupId
-        maxTurns: 10,
+        // maxTurns 由服务端配置控制（通过 NEXT_PUBLIC_AGENT_MAX_TURNS 环境变量）
       })
 
       // 更新会话分组 ID (以服务器返回为准)

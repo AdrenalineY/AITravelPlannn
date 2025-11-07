@@ -488,16 +488,44 @@ ${nodeInfo.date ? `【日期】${nodeInfo.date}` : ''}
       endDate?: string
       sessionId?: string
       userId?: string
+      existingItinerary?: ItineraryCard  // 🔥 新增: 现有行程数据
     } = {}
   ): Promise<ItineraryCard | null> {
     try {
       console.log('[AgentTools] extractPlanStructure - Enhanced Version')
       const startTime = Date.now()
 
+      // 🔥 构建包含现有行程的 prompt
+      let existingItinerarySection = ''
+      if (context.existingItinerary) {
+        console.log('[AgentTools] 检测到现有行程,将在提取时保持未修改部分')
+        existingItinerarySection = `
+
+【⚠️ 重要: 现有行程数据】
+以下是用户当前的完整行程 JSON 数据。用户只想修改部分内容,**未提及修改的部分必须完全保持原样**:
+
+\`\`\`json
+${JSON.stringify(context.existingItinerary, null, 2)}
+\`\`\`
+
+**关键规则**:
+1. 用户在【旅行计划内容】中只描述了需要修改的部分
+2. 对于用户未提及的天数、活动、住宿等,必须从上述 JSON 中原样复制
+3. 不要用"行程保持不变"、"详见原计划"等描述,必须输出完整的 JSON 数据
+4. 只修改用户明确提到要改的部分,其他完全保持不变
+5. 输出的 JSON 必须是完整的行程数据,包含所有天数的完整 segments
+
+**示例**:
+- 如果用户说"把第2天的午餐改成XXX",只修改第2天的午餐 segment,第1天、第3天等完全保持原样
+- 如果用户说"增加一个景点",在合适位置插入新 segment,其他 segments 保持原样
+- 如果用户说"删除第2天下午的活动",删除对应 segment,其他保持原样`
+      }
+
       const prompt = `你是一个专业的旅行数据提取专家。请仔细阅读以下旅行计划,提取所有结构化信息。
 
 【旅行计划内容】
 ${naturalLanguagePlan}
+${existingItinerarySection}
 
 【已知上下文】
 - 目的地: ${context.destination || '未知'}
