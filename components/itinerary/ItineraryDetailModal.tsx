@@ -495,11 +495,7 @@ export function ItineraryDetailModal({
       footer={
         <Space>
           <Button onClick={onClose}>关闭</Button>
-          {onContinueChat && (
-            <Button type="default" onClick={onContinueChat}>
-              继续对话
-            </Button>
-          )}
+          {/* 移除继续对话按钮 */}
           {onEdit && (
             <Button type="primary" onClick={onEdit}>
               编辑行程

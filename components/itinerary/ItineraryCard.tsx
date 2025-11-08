@@ -1,21 +1,13 @@
 'use client'
 
 import React from 'react'
-import { Card, Space, Tag, Typography, Button, Tooltip, Badge, Divider } from 'antd'
+import { Card, Space, Tag, Typography, Tooltip, Divider } from 'antd'
 import {
   CalendarOutlined,
   TeamOutlined,
   DollarOutlined,
   EnvironmentOutlined,
   ClockCircleOutlined,
-  EyeOutlined,
-  EditOutlined,
-  ShareAltOutlined,
-  HeartOutlined,
-  HeartFilled,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  ClockCircleFilled,
 } from '@ant-design/icons'
 import type { ItineraryCard as ItineraryCardType } from '@/types'
 
@@ -24,11 +16,7 @@ const { Text, Title, Paragraph } = Typography
 interface ItineraryCardProps {
   itinerary: ItineraryCardType
   onClick?: () => void
-  onEdit?: () => void
-  onShare?: () => void
-  onFavorite?: () => void
   isFavorite?: boolean
-  showActions?: boolean
   compact?: boolean
   showCover?: boolean  // 🆕 控制是否显示封面图
 }
@@ -36,11 +24,7 @@ interface ItineraryCardProps {
 export function ItineraryCard({
   itinerary,
   onClick,
-  onEdit,
-  onShare,
-  onFavorite,
   isFavorite = false,
-  showActions = true,
   compact = false,
   showCover = true,  // 🆕 默认显示封面图
 }: ItineraryCardProps) {
@@ -57,22 +41,7 @@ export function ItineraryCard({
     return `${formatDate(itinerary.startDate)} - ${formatDate(itinerary.endDate)}`
   }
 
-  const getStatusConfig = (status?: string) => {
-    switch (status) {
-      case 'completed':
-        return { icon: <CheckCircleOutlined />, color: 'success', text: '已完成' }
-      case 'in-progress':
-        return { icon: <ClockCircleFilled />, color: 'processing', text: '进行中' }
-      case 'draft':
-        return { icon: <EditOutlined />, color: 'default', text: '草稿' }
-      case 'cancelled':
-        return { icon: <ExclamationCircleOutlined />, color: 'error', text: '已取消' }
-      default:
-        return { icon: <ClockCircleOutlined />, color: 'default', text: '草稿' }
-    }
-  }
-
-  const statusConfig = getStatusConfig(itinerary.status)
+  // 移除状态相关函数
 
   const getCoverImage = () => {
     // 根据目的地返回默认封面图
@@ -120,9 +89,7 @@ export function ItineraryCard({
               <Title level={5} className="!mb-0 truncate">
                 {itinerary.title || '未命名行程'}
               </Title>
-              <Tag color={statusConfig.color} icon={statusConfig.icon}>
-                {statusConfig.text}
-              </Tag>
+              {/* 移除状态标签显示 */}
             </div>
             
             <Space size="middle" className="text-gray-500 text-sm" wrap>
@@ -172,23 +139,7 @@ export function ItineraryCard({
             </Space>
           </div>
 
-          {showActions && (
-            <Space className="card-actions ml-4">
-              <Tooltip title="查看详情">
-                <Button type="text" icon={<EyeOutlined />} onClick={onClick} />
-              </Tooltip>
-              <Tooltip title="编辑">
-                <Button type="text" icon={<EditOutlined />} onClick={onEdit} />
-              </Tooltip>
-              <Tooltip title={isFavorite ? '取消收藏' : '收藏'}>
-                <Button
-                  type="text"
-                  icon={isFavorite ? <HeartFilled className="text-red-500" /> : <HeartOutlined />}
-                  onClick={onFavorite}
-                />
-              </Tooltip>
-            </Space>
-          )}
+          {/* 移除操作按钮 */}
         </div>
 
         {itinerary.tags && itinerary.tags.length > 0 && (
@@ -208,48 +159,28 @@ export function ItineraryCard({
 
   // 标准卡片模式 - 用于网格视图
   return (
-    <Badge.Ribbon text={statusConfig.text} color={statusConfig.color}>
-      <Card
-        hoverable
-        onClick={handleCardClick}
-        className="itinerary-card transition-all hover:shadow-xl"
-        cover={
-          showCover ? (
-            <div
-              className="h-48 bg-cover bg-center relative"
-              style={{ backgroundImage: `url(${getCoverImage()})` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <Title level={4} className="!mb-0 !text-white truncate">
-                  {itinerary.title || '未命名行程'}
-                </Title>
-              </div>
+    <Card
+      hoverable
+      onClick={handleCardClick}
+      className="itinerary-card transition-all hover:shadow-xl"
+      cover={
+        showCover ? (
+          <div
+            className="h-48 bg-cover bg-center relative"
+            style={{ backgroundImage: `url(${getCoverImage()})` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
+            <div className="absolute bottom-0 left-0 right-0 p-4">
+              <Title level={4} className="!mb-0 !text-white truncate">
+                {itinerary.title || '未命名行程'}
+              </Title>
             </div>
-          ) : undefined
-        }
-        actions={
-          showActions
-            ? [
-                <Tooltip key="view" title="查看详情">
-                  <Button type="link" icon={<EyeOutlined />} onClick={onClick}>
-                    查看
-                  </Button>
-                </Tooltip>,
-                <Tooltip key="edit" title="编辑">
-                  <Button type="link" icon={<EditOutlined />} onClick={onEdit}>
-                    编辑
-                  </Button>
-                </Tooltip>,
-                <Tooltip key="share" title="分享">
-                  <Button type="link" icon={<ShareAltOutlined />} onClick={onShare}>
-                    分享
-                  </Button>
-                </Tooltip>,
-              ]
-            : undefined
-        }
-      >
+          </div>
+        ) : undefined
+      }
+      // 移除操作按钮
+      actions={undefined}
+    >
         <div className="space-y-3">
           {/* 🆕 不显示封面时在内容区显示标题 */}
           {!showCover && (
@@ -368,6 +299,5 @@ export function ItineraryCard({
           )}
         </div>
       </Card>
-    </Badge.Ribbon>
-  )
+    )
 }

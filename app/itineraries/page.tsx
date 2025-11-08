@@ -21,7 +21,6 @@ import {
 import {
   PlusOutlined,
   SearchOutlined,
-  FilterOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
   SortAscendingOutlined,
@@ -44,7 +43,6 @@ const { Search } = Input
 
 type ViewMode = 'grid' | 'list'
 type SortBy = 'date' | 'title' | 'cost' | 'recent'
-type FilterStatus = 'all' | 'draft' | 'in-progress' | 'completed' | 'cancelled'
 
 export default function ItinerariesPage() {
   const router = useRouter()
@@ -53,7 +51,6 @@ export default function ItinerariesPage() {
   const [filteredItineraries, setFilteredItineraries] = useState<ItineraryCardType[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortBy, setSortBy] = useState<SortBy>('recent')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [searchText, setSearchText] = useState('')
   const [selectedItinerary, setSelectedItinerary] = useState<ItineraryCardType | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -67,7 +64,7 @@ export default function ItinerariesPage() {
   // 过滤和排序
   useEffect(() => {
     filterAndSortItineraries()
-  }, [itineraries, searchText, filterStatus, sortBy])
+  }, [itineraries, searchText, sortBy])
 
   const loadItineraries = async () => {
     setLoading(true)
@@ -178,11 +175,6 @@ export default function ItinerariesPage() {
 
   const filterAndSortItineraries = () => {
     let filtered = [...itineraries]
-
-    // 状态筛选
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(item => item.status === filterStatus)
-    }
 
     // 搜索筛选
     if (searchText.trim()) {
@@ -332,7 +324,7 @@ export default function ItinerariesPage() {
 
           {/* 搜索和筛选 */}
           <Card>
-            <Space direction="vertical" size="middle" className="w-full">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <Search
                 placeholder="搜索目的地或行程标题..."
                 allowClear
@@ -340,32 +332,19 @@ export default function ItinerariesPage() {
                 prefix={<SearchOutlined />}
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
-                style={{ maxWidth: 600 }}
+                style={{ flex: 1, maxWidth: 600 }}
               />
 
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <Space size="middle" wrap>
-                  <Space>
-                    <FilterOutlined />
-                    <Text>状态:</Text>
-                    <Radio.Group value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                      <Radio.Button value="all">全部</Radio.Button>
-                      <Radio.Button value="draft">草稿</Radio.Button>
-                      <Radio.Button value="in-progress">进行中</Radio.Button>
-                      <Radio.Button value="completed">已完成</Radio.Button>
-                    </Radio.Group>
-                  </Space>
-
-                  <Space>
-                    <SortAscendingOutlined />
-                    <Text>排序:</Text>
-                    <Select value={sortBy} onChange={setSortBy} style={{ width: 120 }}>
-                      <Select.Option value="recent">最近更新</Select.Option>
-                      <Select.Option value="date">出发日期</Select.Option>
-                      <Select.Option value="title">标题</Select.Option>
-                      <Select.Option value="cost">预算</Select.Option>
-                    </Select>
-                  </Space>
+              <Space size="middle" wrap>
+                <Space>
+                  <SortAscendingOutlined />
+                  <Text>排序:</Text>
+                  <Select value={sortBy} onChange={setSortBy} style={{ width: 120 }}>
+                    <Select.Option value="recent">最近更新</Select.Option>
+                    <Select.Option value="date">出发日期</Select.Option>
+                    <Select.Option value="title">标题</Select.Option>
+                    <Select.Option value="cost">预算</Select.Option>
+                  </Select>
                 </Space>
 
                 <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)}>
@@ -376,8 +355,8 @@ export default function ItinerariesPage() {
                     <UnorderedListOutlined /> 列表
                   </Radio.Button>
                 </Radio.Group>
-              </div>
-            </Space>
+              </Space>
+            </div>
           </Card>
         </div>
 
@@ -390,13 +369,13 @@ export default function ItinerariesPage() {
           <Card>
             <Empty
               description={
-                searchText || filterStatus !== 'all'
+                searchText
                   ? '没有找到匹配的行程'
                   : '还没有创建任何行程'
               }
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
-              {!searchText && filterStatus === 'all' && (
+              {!searchText && (
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateNew}>
                   创建第一个行程
                 </Button>
@@ -410,9 +389,6 @@ export default function ItinerariesPage() {
                 <ItineraryCard
                   itinerary={itinerary}
                   onClick={() => handleViewDetail(itinerary)}
-                  onEdit={() => handleEdit(itinerary)}
-                  onShare={() => handleShare(itinerary)}
-                  onFavorite={() => handleFavorite(itinerary)}
                   isFavorite={favorites.has(itinerary.id)}
                   showCover={false}
                 />
@@ -426,9 +402,6 @@ export default function ItinerariesPage() {
                 key={itinerary.id}
                 itinerary={itinerary}
                 onClick={() => handleViewDetail(itinerary)}
-                onEdit={() => handleEdit(itinerary)}
-                onShare={() => handleShare(itinerary)}
-                onFavorite={() => handleFavorite(itinerary)}
                 isFavorite={favorites.has(itinerary.id)}
                 compact
                 showCover={false}
@@ -443,7 +416,6 @@ export default function ItinerariesPage() {
           itinerary={selectedItinerary}
           onClose={() => setDetailModalOpen(false)}
           onEdit={() => handleEdit(selectedItinerary!)}
-          onContinueChat={handleContinueChat}
         />
       </Content>
     </Layout>

@@ -38,7 +38,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       case 'logout':
         authService.signOut()
         resetAuth()
-        router.push('/auth/signin')
+        router.push('/auth/login')
         break
     }
   }
