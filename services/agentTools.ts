@@ -871,6 +871,18 @@ ${existingItinerarySection}
                   category = 'ticket'
                 }
                 
+                // ⚠️ 重要: 跳过 type='accommodation' 的 segments
+                // 住宿费用应该从 accommodation.recommendations 中统一计算
+                // 避免重复计算
+                if (seg.type === 'accommodation') {
+                  console.log(`[AgentTools] 跳过 segment 中的住宿费用,将从 accommodation.recommendations 统一计算: ${seg.title}`)
+                  // 仍然设置 costCategory,但不累加到 costSummary
+                  if (!seg.costCategory) {
+                    seg.costCategory = category
+                  }
+                  return  // 跳过此 segment
+                }
+                
                 costSummary[category] += seg.costEstimate
                 costItems[category].push({
                   name: seg.title || seg.location,
@@ -886,6 +898,38 @@ ${existingItinerarySection}
             })
           }
         })
+      }
+      
+      // 🔧 **住宿费用计算** - 只计算第一个推荐酒店(用户只会选择一家)
+      // recommendations 中的多个酒店是供用户选择的,不是全部都住
+      if (planData.accommodation?.recommendations && Array.isArray(planData.accommodation.recommendations)) {
+        console.log('[AgentTools] 正在计算住宿推荐的费用...')
+        
+        // 只取第一个推荐酒店(通常是最佳推荐)
+        const selectedHotel = planData.accommodation.recommendations[0]
+        
+        if (selectedHotel) {
+          // 优先使用 totalCost,如果没有则计算 pricePerNight × totalNights
+          let hotelCost = 0
+          if (selectedHotel.totalCost && selectedHotel.totalCost > 0) {
+            hotelCost = selectedHotel.totalCost
+          } else if (selectedHotel.pricePerNight && selectedHotel.totalNights) {
+            hotelCost = selectedHotel.pricePerNight * selectedHotel.totalNights
+            // 同时设置 totalCost 字段
+            selectedHotel.totalCost = hotelCost
+          }
+          
+          if (hotelCost > 0) {
+            costSummary.accommodation += hotelCost
+            costItems.accommodation.push({
+              name: selectedHotel.name || '推荐酒店',
+              amount: hotelCost,
+              dayNumber: 0  // 住宿不属于特定某天
+            })
+            console.log(`[AgentTools] 添加酒店费用(第1个推荐): ${selectedHotel.name} - ¥${hotelCost} (${selectedHotel.pricePerNight}/晚 × ${selectedHotel.totalNights}晚)`)
+            console.log(`[AgentTools] 注意: 其他 ${planData.accommodation.recommendations.length - 1} 个推荐酒店仅供选择,不计入预算`)
+          }
+        }
       }
       
       // 计算总费用
