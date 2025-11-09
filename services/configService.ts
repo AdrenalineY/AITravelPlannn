@@ -11,9 +11,46 @@ export class ConfigService {
   }
 
   /**
+   * 获取 Supabase 客户端 (确保使用最新的 session)
+   */
+  private getClient(): SupabaseClient {
+    // 每次都创建新的客户端,确保获取最新的 session
+    return createClient()
+  }
+
+  /**
    * 保存配置
    */
   async saveConfig(userId: string, config: APIConfig): Promise<void> {
+    console.log('[ConfigService.saveConfig] ===== 开始保存配置 =====')
+    console.log('[ConfigService.saveConfig] userId:', userId)
+    
+    // 使用新创建的客户端,确保获取最新的 session
+    const client = this.getClient()
+    
+    // 简化认证检查 - 只记录日志,不阻止操作
+    // 让数据库的 RLS 策略来处理权限验证
+    try {
+      const { data: { session } } = await client.auth.getSession()
+      if (session) {
+        console.log('[ConfigService] ✅ Session 有效, userId:', session.user.id)
+        console.log('[ConfigService] Session 过期时间:', new Date(session.expires_at! * 1000))
+      } else {
+        console.warn('[ConfigService] ⚠️ getSession 返回 null, 将依赖 RLS 验证')
+        
+        // 尝试 getUser 获取更多信息
+        const { data: { user } } = await client.auth.getUser()
+        if (user) {
+          console.log('[ConfigService] ✅ getUser 成功, userId:', user.id)
+        } else {
+          console.warn('[ConfigService] ⚠️ getUser 也返回 null')
+        }
+      }
+    } catch (authError) {
+      console.error('[ConfigService] ❌ 认证检查失败:', authError)
+      // 不抛出错误,继续执行,让 RLS 处理
+    }
+
     // 动态导入加密函数（避免服务器端执行时的问题）
     const { simpleEncrypt } = await import('@/lib/crypto')
     
@@ -26,27 +63,63 @@ export class ConfigService {
       ? await simpleEncrypt(config.map.securityCode, userId)
       : null
 
-    const { error } = await this.supabase
-      .from('user_configs')
-      .upsert({
-        user_id: userId,
-        llm_provider: config.llm.provider,
-        llm_api_key_encrypted: encryptedLLMKey,
-        llm_base_url: config.llm.baseUrl,
-        llm_model: config.llm.model,
-        speech_provider: config.speech.provider,
-        speech_api_key_encrypted: encryptedSpeechKey,
-        speech_app_id: config.speech.appId,
-        speech_api_secret: config.speech.apiSecret,
-        map_provider: config.map.provider,
-        map_web_service_key_encrypted: encryptedMapWebServiceKey,
-        map_js_api_key_encrypted: encryptedMapJsApiKey,
-        map_security_code_encrypted: encryptedMapSecurityCode,
-        has_completed_setup: true,
-        updated_at: new Date().toISOString(),
-      })
+    const configData = {
+      user_id: userId,
+      llm_provider: config.llm.provider,
+      llm_api_key_encrypted: encryptedLLMKey,
+      llm_base_url: config.llm.baseUrl,
+      llm_model: config.llm.model,
+      speech_provider: config.speech.provider,
+      speech_api_key_encrypted: encryptedSpeechKey,
+      speech_app_id: config.speech.appId,
+      speech_api_secret: config.speech.apiSecret,
+      map_provider: config.map.provider,
+      map_web_service_key_encrypted: encryptedMapWebServiceKey,
+      map_js_api_key_encrypted: encryptedMapJsApiKey,
+      map_security_code_encrypted: encryptedMapSecurityCode,
+      has_completed_setup: true,
+      updated_at: new Date().toISOString(),
+    }
 
-    if (error) throw error
+    // 先检查记录是否存在 (使用 maybeSingle 避免 0 行错误)
+    const { data: existing, error: selectError } = await client
+      .from('user_configs')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()  // 使用 maybeSingle 代替 single,允许 0 行返回 null
+
+    // 如果查询本身失败(不是没有数据),抛出错误
+    if (selectError) {
+      console.error('[ConfigService] 查询配置记录失败:', selectError)
+      throw selectError
+    }
+
+    if (existing) {
+      // 记录存在 - 使用 UPDATE
+      console.log('[ConfigService] 记录已存在,使用 UPDATE')
+      const { error } = await client
+        .from('user_configs')
+        .update(configData)
+        .eq('user_id', userId)
+      
+      if (error) {
+        console.error('[ConfigService] UPDATE 失败:', error)
+        throw error
+      }
+    } else {
+      // 记录不存在 - 使用 INSERT
+      console.log('[ConfigService] 记录不存在,使用 INSERT')
+      const { error } = await client
+        .from('user_configs')
+        .insert(configData)
+      
+      if (error) {
+        console.error('[ConfigService] INSERT 失败:', error)
+        console.error('[ConfigService] 当前 userId:', userId)
+        console.error('[ConfigService] 错误详情:', JSON.stringify(error, null, 2))
+        throw error
+      }
+    }
   }
 
   /**

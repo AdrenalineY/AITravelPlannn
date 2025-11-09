@@ -32,6 +32,7 @@ export class AuthService {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/setup/api-config`,
         data: {
           display_name: profile.displayName,
           avatar: profile.avatar,
@@ -44,11 +45,25 @@ export class AuthService {
     if (error) throw error
     if (!data.user) throw new Error('注册失败')
 
-    // 创建用户配置记录
-    await this.supabase.from('user_configs').insert({
-      user_id: data.user.id,
-      has_completed_setup: false,
+    console.log('[AuthService] signUp 结果:', {
+      user: data.user,
+      session: data.session,
+      needsEmailConfirmation: !data.session,
     })
+
+    // 如果有 session (邮箱确认已禁用),创建用户配置记录
+    if (data.session) {
+      const { error: configError } = await this.supabase.from('user_configs').insert({
+        user_id: data.user.id,
+        has_completed_setup: false,
+      })
+
+      // 如果配置记录创建失败,记录错误但不阻止注册流程
+      if (configError) {
+        console.warn('[AuthService] 创建用户配置记录失败:', configError)
+        console.warn('[AuthService] 将在后续配置保存时自动创建')
+      }
+    }
 
     return {
       user: this.mapSupabaseUser(data.user, {
@@ -59,6 +74,7 @@ export class AuthService {
         missingConfigs: ['llm', 'speech', 'map'],
       }),
       session: data.session,
+      needsEmailConfirmation: !data.session,
     }
   }
 
@@ -67,16 +83,6 @@ export class AuthService {
    */
   async signOut() {
     const { error } = await this.supabase.auth.signOut()
-    if (error) throw error
-  }
-
-  /**
-   * 重置密码
-   */
-  async resetPassword(email: string) {
-    const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    })
     if (error) throw error
   }
 

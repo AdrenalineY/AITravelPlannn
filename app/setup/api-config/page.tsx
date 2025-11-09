@@ -216,10 +216,20 @@ export default function APIConfigPage() {
   const handleSubmit = async () => {
     try {
       setIsSaving(true)
+      console.log('[API Config] 开始保存配置...')
+      console.log('[API Config] 当前用户:', user)
+      console.log('[API Config] 用户ID:', user?.id)
+      
       const finalConfig = { ...config!, ...form.getFieldsValue() } as APIConfig
+      console.log('[API Config] 最终配置:', finalConfig)
 
+      console.log('[API Config] 调用 saveConfig...')
       await configService.saveConfig(user!.id, finalConfig)
+      console.log('[API Config] saveConfig 成功')
+      
+      console.log('[API Config] 调用 markConfigComplete...')
       await configService.markConfigComplete(user!.id)
+      console.log('[API Config] markConfigComplete 成功')
 
       // 更新 ConfigStore 中的配置
       setConfig(finalConfig)

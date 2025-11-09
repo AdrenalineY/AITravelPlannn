@@ -22,5 +22,35 @@ export function createClient() {
     )
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        // 从 document.cookie 中获取
+        if (typeof document === 'undefined') return undefined
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) return parts.pop()?.split(';').shift()
+        return undefined
+      },
+      set(name: string, value: string, options: any) {
+        // 设置到 document.cookie
+        if (typeof document === 'undefined') return
+        let cookieString = `${name}=${value}`
+        if (options?.maxAge) cookieString += `; max-age=${options.maxAge}`
+        if (options?.path) cookieString += `; path=${options.path}`
+        if (options?.domain) cookieString += `; domain=${options.domain}`
+        if (options?.sameSite) cookieString += `; samesite=${options.sameSite}`
+        if (options?.secure) cookieString += '; secure'
+        document.cookie = cookieString
+      },
+      remove(name: string, options: any) {
+        // 从 document.cookie 中删除
+        if (typeof document === 'undefined') return
+        let cookieString = `${name}=; max-age=0`
+        if (options?.path) cookieString += `; path=${options.path}`
+        if (options?.domain) cookieString += `; domain=${options.domain}`
+        document.cookie = cookieString
+      },
+    },
+  })
 }
