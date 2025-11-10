@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Layout, Button, message, Spin, Input, Space, Card, Descriptions, Tag, Row, Col } from 'antd'
 import {
@@ -40,7 +40,8 @@ interface Message {
   timestamp: string
 }
 
-export default function ItineraryEditPage() {
+// 实际的行程编辑组件
+function ItineraryEditPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const itineraryId = searchParams.get('id')
@@ -690,7 +691,7 @@ export default function ItineraryEditPage() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>💬</div>
                 <div>开始对话,让 AI 帮你规划行程</div>
                 <div style={{ fontSize: 12, marginTop: 8 }}>
-                  例如: "帮我规划一个3天2晚的上海之旅"
+                  例如: &quot;帮我规划一个3天2晚的上海之旅&quot;
                 </div>
               </div>
             ) : (
@@ -792,5 +793,20 @@ export default function ItineraryEditPage() {
         />
       </Content>
     </Layout>
+  )
+}
+
+// 使用 Suspense 包裹的默认导出组件
+export default function ItineraryEditPage() {
+  return (
+    <Suspense fallback={
+      <Layout style={{ minHeight: '100vh' }}>
+        <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Spin size="large" tip="加载中..." />
+        </Content>
+      </Layout>
+    }>
+      <ItineraryEditPageContent />
+    </Suspense>
   )
 }

@@ -16,6 +16,9 @@ import { mapService } from '@/services/mapService'
 import { saveItineraryCard } from '@/services/itineraryCardService'
 import AgentConfig from '@/config/agent.config'
 
+// 标记为动态路由(因为使用了 cookies)
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()

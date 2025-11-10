@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { simpleDecrypt } from '@/lib/crypto'
 
+// 标记为动态路由(因为使用了 cookies)
+export const dynamic = 'force-dynamic'
+
 /**
  * 地理编码 API - 将地址或名称转换为坐标
  * GET /api/map/geocode?address=xxx

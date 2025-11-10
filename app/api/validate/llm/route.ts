@@ -49,7 +49,7 @@ async function validateAliyunLLM(
 ): Promise<NextResponse> {
   try {
     // 阿里云百炼(DashScope)的正确 API 端点
-    // 注意：URL 路径不包含 /generation，直接是 /compatible-mode/v1/chat/completions
+    // 直接使用用户提供的完整 URL
     const url = baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     const testModel = model || 'qwen-turbo'
 
@@ -116,7 +116,7 @@ async function validateAliyunLLM(
       return NextResponse.json({
         success: false,
         error: 'API 端点不存在',
-        details: `请检查 Base URL 是否正确。推荐使用: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`,
+        details: `请检查 API 端点是否正确。推荐使用: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`,
         statusCode: response.status,
       })
     } else {
@@ -145,6 +145,7 @@ async function validateOpenAILLM(
   model?: string
 ): Promise<NextResponse> {
   try {
+    // 直接使用用户提供的完整 URL
     const url = baseUrl || 'https://api.openai.com/v1/chat/completions'
     const testModel = model || 'gpt-3.5-turbo'
 

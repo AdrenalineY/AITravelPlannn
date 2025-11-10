@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// 标记为动态路由(因为使用了 cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -53,13 +56,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 测试 LLM API 调用
-    const baseUrl = config.llm.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    const url = config.llm.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     const model = config.llm.model || 'qwen-plus'
 
-    console.log('[LLM Test] 准备调用 API:', { baseUrl, model })
+    console.log('[LLM Test] 准备调用 API:', { url, model })
 
     const startTime = Date.now()
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest) {
       details: {
         provider: config.llm.provider,
         model,
-        baseUrl,
+        url,
         responseTime,
         response: data.choices?.[0]?.message?.content || data,
         usage: data.usage,

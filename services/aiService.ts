@@ -123,10 +123,10 @@ ${JSON.stringify(itinerary, null, 2)}
    * 调用阿里云百炼 API (OpenAI 兼容模式)
    */
   private async callAliyunAPI(messages: Array<{ role: string; content: string }>): Promise<string> {
-    const baseUrl = this.config?.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    const url = this.config?.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     const model = this.config?.model || 'qwen-plus'
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -152,10 +152,10 @@ ${JSON.stringify(itinerary, null, 2)}
    * 调用 OpenAI API
    */
   private async callOpenAIAPI(messages: Array<{ role: string; content: string }>): Promise<string> {
-    const baseUrl = this.config?.baseUrl || 'https://api.openai.com/v1'
+    const url = this.config?.baseUrl || 'https://api.openai.com/v1/chat/completions'
     const model = this.config?.model || 'gpt-4'
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

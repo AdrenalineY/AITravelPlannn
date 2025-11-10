@@ -346,9 +346,9 @@ export default function APIConfigPage() {
                 </Form.Item>
 
                 <Form.Item 
-                  label="Base URL（可选）" 
+                  label="API 端点（可选）" 
                   name={['llm', 'baseUrl']}
-                  extra="默认使用阿里云百炼 OpenAI 兼容接口"
+                  extra="填写完整的 API 端点地址。默认: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
                 >
                   <Input placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" />
                 </Form.Item>
@@ -471,22 +471,6 @@ export default function APIConfigPage() {
                 >
                   <Input.Password placeholder="请输入安全密钥（可选）" />
                 </Form.Item>
-
-                <Alert
-                  message="如何配置安全密钥？"
-                  description={
-                    <ol className="list-decimal ml-4 space-y-1">
-                      <li>访问高德开放平台控制台</li>
-                      <li>找到「Web端(JS API)」应用</li>
-                      <li>在应用设置中找到「安全密钥」配置项</li>
-                      <li>生成或设置安全密钥,然后在此处填写</li>
-                      <li>安全密钥用于防止 API Key 被盗用</li>
-                    </ol>
-                  }
-                  type="info"
-                  showIcon
-                  className="mb-4"
-                />
 
                 <Alert
                   message="如何创建 API Key？"

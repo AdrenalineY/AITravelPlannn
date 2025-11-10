@@ -1,0 +1,81 @@
+# ========================================
+# Docker 构建忽略文件
+# ========================================
+
+# 依赖目录
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js 构建输出
+.next/
+out/
+
+# 测试和覆盖率
+coverage
+.nyc_output
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# 环境变量文件(敏感信息)
+# .env
+# .env.*
+# !.env.local.example
+
+# 开发工具
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# 文档 (不需要打包到镜像中)
+README.md
+docs/
+*.md
+!DOCKER_README.md
+
+# Supabase 配置和迁移文件 (不需要打包)
+supabase/
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# 日志
+logs
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试文件
+test_*.js
+test_*.json
+__tests__
+__mocks__
+
+# 脚本文件 (本地使用,不需要打包)
+scripts/
+docker-build-push.ps1
+docker-deploy.ps1
+
+# Docker 相关
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 其他
+.editorconfig
+.eslintcache
+.prettierrc

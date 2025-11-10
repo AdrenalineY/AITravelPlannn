@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// 标记为动态路由(因为使用了 cookies)
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/itinerary-cards - 获取用户的所有行程卡片
  * 🔄 重构: 使用新的 itinerary_cards 表 (JSON 存储)

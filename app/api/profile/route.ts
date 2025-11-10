@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { TravelPreferencesProfile } from '@/types'
 
+// 标记为动态路由(因为使用了 cookies)
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/profile
  * 获取用户个人信息和旅行偏好

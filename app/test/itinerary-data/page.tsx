@@ -474,9 +474,9 @@ export default function ItineraryTestPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="text-sm font-semibold mb-2 text-blue-900">📖 使用说明</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
-              <li>点击"加载示例数据"查看标准格式</li>
+              <li>点击&quot;加载示例数据&quot;查看标准格式</li>
               <li>或粘贴从 Agent 提取的 JSON 数据</li>
-              <li>点击"提交并保存"将数据存入数据库</li>
+              <li>点击&quot;提交并保存&quot;将数据存入数据库</li>
               <li>保存成功后可以到行程列表页面查看效果</li>
             </ol>
             <div className="mt-3 p-3 bg-white border border-blue-300 rounded space-y-2">

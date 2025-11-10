@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: #52c41a; }
+        .error { color: #ff4d4f; }
+        .warning { color: #faad14; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        #result {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Docker 容器测试页面</h1>
+    
+    <div class="card">
+        <h2>环境变量检查</h2>
+        <div id="envCheck">检查中...</div>
+    </div>
+
+    <div class="card">
+        <h2>Supabase 连接测试</h2>
+        <button onclick="testSupabase()">测试 Supabase</button>
+        <button onclick="testAuth()">测试认证</button>
+        <div id="supabaseResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>API 端点测试</h2>
+        <button onclick="testAPI('/api/profile')">测试 Profile API</button>
+        <button onclick="testAPI('/api/config/map-key')">测试 MapKey API</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>页面跳转测试</h2>
+        <button onclick="location.href='/auth/login'">跳转到登录页</button>
+        <button onclick="location.href='/dashboard'">跳转到仪表板</button>
+    </div>
+
+    <script>
+        // 检查环境变量
+        function checkEnv() {
+            const env = {
+                SUPABASE_URL: typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL,
+                SUPABASE_KEY: typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+            };
+            
+            let html = '<ul>';
+            if (env.SUPABASE_URL) {
+                html += `<li class="success">✅ SUPABASE_URL: 已设置</li>`;
+            } else {
+                html += `<li class="error">❌ SUPABASE_URL: 未设置</li>`;
+            }
+            
+            if (env.SUPABASE_KEY) {
+                html += `<li class="success">✅ SUPABASE_ANON_KEY: 已设置</li>`;
+            } else {
+                html += `<li class="error">❌ SUPABASE_ANON_KEY: 未设置</li>`;
+            }
+            html += '</ul>';
+            
+            html += '<p class="warning">注意: 客户端环境变量需要通过构建时注入</p>';
+            
+            document.getElementById('envCheck').innerHTML = html;
+        }
+
+        // 测试 Supabase 连接
+        async function testSupabase() {
+            const resultDiv = document.getElementById('supabaseResult');
+            resultDiv.innerHTML = '<p>测试中...</p>';
+            
+            try {
+                // 这里模拟 Supabase 测试
+                resultDiv.innerHTML = `
+                    <p class="warning">⚠️ 注意: 此页面无法直接测试 Supabase (需要 Next.js 环境)</p>
+                    <p>请使用浏览器开发者工具在登录页检查:</p>
+                    <ul>
+                        <li>Console 是否有 Supabase 错误</li>
+                        <li>Network 是否能访问 Supabase API</li>
+                    </ul>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ 错误: ${error.message}</p>`;
+            }
+        }
+
+        // 测试认证
+        async function testAuth() {
+            const resultDiv = document.getElementById('supabaseResult');
+            resultDiv.innerHTML = '<p>测试中...</p>';
+            
+            resultDiv.innerHTML = `
+                <p class="warning">⚠️ 认证测试需要在实际应用页面进行</p>
+                <p>建议检查:</p>
+                <ol>
+                    <li>访问 /auth/login 页面</li>
+                    <li>打开开发者工具 Console</li>
+                    <li>查看是否有 Supabase 初始化错误</li>
+                    <li>检查 Network 标签页的请求</li>
+                </ol>
+            `;
+        }
+
+        // 测试 API
+        async function testAPI(endpoint) {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '<p>测试中...</p>';
+            
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                
+                let html = `
+                    <p class="success">✅ API 响应成功</p>
+                    <p>状态码: ${response.status}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ 错误: ${error.message}</p>`;
+            }
+        }
+
+        // 页面加载时检查
+        window.onload = function() {
+            checkEnv();
+            console.log('🔍 测试页面加载完成');
+            console.log('当前 URL:', window.location.href);
+            console.log('User Agent:', navigator.userAgent);
+        };
+    </script>
+</body>
+</html>

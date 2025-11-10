@@ -74,8 +74,8 @@ export default function SupabaseConfigCheck() {
                 <p>请访问 Supabase Dashboard 检查邮箱确认设置:</p>
                 <ol style={{ marginLeft: '20px', marginTop: '10px' }}>
                   <li>访问: <a href={`https://supabase.com/dashboard/project/${config.url?.match(/https:\/\/(.+?)\.supabase\.co/)?.[1]}/auth/providers`} target="_blank" rel="noopener noreferrer">Authentication → Providers</a></li>
-                  <li>找到 "Email" 提供商</li>
-                  <li>检查 "Confirm email" 是否勾选</li>
+                  <li>找到 &quot;Email&quot; 提供商</li>
+                  <li>检查 &quot;Confirm email&quot; 是否勾选</li>
                   <li><strong>推荐开发环境: 取消勾选</strong></li>
                 </ol>
               </div>
